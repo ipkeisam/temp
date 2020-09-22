@@ -1,1 +1,0 @@
-offline_token: "{{ vault_offline_token }}"

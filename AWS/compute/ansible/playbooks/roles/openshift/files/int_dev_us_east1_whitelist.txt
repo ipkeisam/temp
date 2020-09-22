@@ -1,2 +1,0 @@
-CN=OZ_INF_BB00000085_Admin,OU=BB00000085-BackendRoles,OU=INF,OU=Groups,OU=OZ,DC=cguser,DC=capgroup,DC=com
-CN=OZ_INF_BB00000085_Login,OU=BB00000085-BackendRoles,OU=INF,OU=Groups,OU=OZ,DC=cguser,DC=capgroup,DC=com
