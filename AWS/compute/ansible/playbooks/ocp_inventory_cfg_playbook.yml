@@ -1,0 +1,26 @@
+---
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+######
+# 
+# Playbook for creating OpenShift Cloud Platform inventory configuration file from Jinja2 templating
+#
+##
+
+  vars:
+    # specify vars file to use
+    openshift_aws_env_var_file: <ENV_VAR_FILE>
+    # specify s3 and ec2 keys to use 
+
+  tasks:
+  - name: 
+    include_role:
+      name: openshift
+      vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: create_inventory_cfg_file.yml
+    vars:
+        # specify file name 
+        openshift_aws_config_file_name: "{{ openshift_aws_env }}.cfg"

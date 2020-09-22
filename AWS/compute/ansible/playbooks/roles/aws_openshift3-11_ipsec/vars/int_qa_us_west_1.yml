@@ -1,0 +1,106 @@
+---
+
+###
+# start of block for OCP int-qa us-west-1
+###
+openshift_aws_ssh_key_name: ocp-int-qa-us-west-1
+openshift_aws_rootenc_ami: ami-05221f5f9065c3b24
+openshift_aws_volume_kms_key_id: b8853a2f-55e1-4e72-9b43-84627b8c52ef
+openshift_aws_s3_kms_key_id: a48cab6e-9803-41dc-a230-6fb1df438736
+
+openshift_aws_clusterid: vpc1-us-west-1-ocp-int-qa
+openshift_aws_region: us-west-1
+openshift_aws_env_type: qa
+
+# misc flags
+openshift_aws_dual_nic: False
+openshift_aws_external_facing: False
+nvme: true
+
+# define instance types
+openshift_aws_ec2_control_instance_type: t2.medium
+openshift_aws_ec2_master_instance_type: m5.2xlarge
+openshift_aws_ec2_app_instance_type: m4.2xlarge
+openshift_aws_ec2_infra_instance_type: m5.2xlarge
+
+# subnet information
+openshift_aws_control_host_subnet: 
+  - { admin_subnet: subnet-082862b974020f8e8, az: us-west-1a } 
+
+openshift_aws_admin_subnet_1: 
+  - { subnet: subnet-082862b974020f8e8, az: us-west-1a, count: 1 }
+openshift_aws_admin_subnet_2:
+  - { subnet: subnet-0a8ec8fe5ed002a55, az: us-west-1b, count: 1 }
+openshift_aws_admin_subnet_3:
+  - { subnet: subnet-0bc1ec579c1a27941, az: us-west-1b, count: 1 }
+
+openshift_elb_internalsubnets:
+  - subnet-006f04ad5a0f2b6ea
+  #- subnet-02551faa142f9b414
+  - subnet-084459a7104f87c43
+
+# openshift tagging
+openshift_aws_kubernetes_tag_id: qa1-uswest1
+
+openshift_aws_resource_tags:
+  Name: "{{ openshift_aws_resource_type }}"
+  usage-id: "{{ openshift_aws_atm_id }}"
+  cost-center: "{{ openshift_aws_cost_center }}"
+  sec-profile: normal
+  exp-date: 99-00-9999
+  sd-period: na
+  p-id: "{{ openshift_aws_ppmc_id }}"
+  env-type: "{{ openshift_aws_env_type }}"
+  cloud-dependency: cloudonly
+  app-type: "{{ openshift_aws_resource_type }}"
+  kubernetes.io/cluster/cluster-INT-QA: "{{ openshift_aws_kubernetes_tag_id }}"
+
+#
+# the following section contains variables to create the inventory configuration file
+#
+# define the internal master hostname
+# ex. ocp-console-int.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_internal_master_vip: ocp-console-int.qa-int-usw1-aws.csp.capgroup.com
+# define the master hostname: 
+# ex. ocp-console<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com 
+openshift_aws_master_vip: ocp-console.qa-int-usw1-aws.csp.capgroup.com
+# define the the default master subdomain
+# ex. apps.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_router_vip: .apps.qa-int-usw1-aws.csp.capgroup.com
+# define the EBS availability zone for loggging
+# ex. us-west-1a 
+openshift_aws_logging_ebs_zone: us-west-1a
+# define the EBS availability zone for metrics
+# ex. us-west-1c 
+openshift_aws_metric_ebs_zone: us-west-1b
+# define the s3 bucket name
+# ex. ocp-capgroup-<project name>-<env>-<region>
+openshift_aws_s3_bucket_name: ocp-capgroup-int-qa-west1
+openshift_aws_s3_bucket_region: "{{ openshift_aws_region }}"
+openshift_aws_cluster_name: "{{ openshift_aws_kubernetes_tag_id }}"
+
+openshift_aws_s3_access_key: AKIAJAHXNRERXHWMIOFQ
+openshift_aws_s3_secret_key: 
+openshift_aws_ec2_access_key: AKIAIUMHBEOWBYN6CCSA
+openshift_aws_ec2_secret_key: 
+
+
+# post config IPSec variables
+openshift_aws_env: int-qa-us-west-1
+openshift_create_and_copy_cluster_conf: True
+openshift_create_policies: True
+openshift_copy_policies: True
+openshift_configure_iptables: True
+
+#AWS app type tag 
+aws_controlhost_type: OCP Control Host
+aws_masterhost_type: OCP Master Host
+aws_infrahost_type: OCP Infra Host
+aws_apphost_type: OCP App Host
+aws_loadbalancer_type: OCP Load Balancer
+
+
+#Outcold Tag
+outcold_cluster_tag_key: qa-int-usw1-aws.cluster
+outcold_appnode_tag_key: qa-int-usw1-aws.appnode
+

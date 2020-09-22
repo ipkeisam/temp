@@ -1,0 +1,40 @@
+---
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+#
+# Playbook for provisioning ESI Database in AWS 
+# these assumes key pair and security groups has been created
+#  LastUpdated: 2018-05-22
+#  UpdatedBy: Cuong Tong ( cuot@capgroup.com )
+#
+  vars:
+    esi_aws_env_var_file: esi_dev_us_west_1.yml  
+    esi_aws_provision_database_hosts: True 
+
+  tasks:
+  # Provision database hosts
+  - name: provision database hosts
+    include_role:
+      name: esi
+      vars_from: "{{ esi_aws_env_var_file }}" 
+      tasks_from: provision_database_instances.yml
+    vars:
+      esi_aws_resource_type: ESI Database Host
+      esi_aws_admin_subnet: '{{ vars["esi_aws_admin_subnet_1"] }}'
+      esi_aws_cluster_subnet: '{{ vars["esi_aws_cluster_subnet_1"] }}'
+    when: esi_aws_provision_database_hosts | default(True) | bool
+
+  - name: provision database hosts
+    include_role:
+      name: esi
+      vars_from: "{{ esi_aws_env_var_file }}" 
+      tasks_from: provision_database_instances.yml
+    vars:
+      esi_aws_resource_type: ESI Database Host
+      esi_aws_admin_subnet: '{{ vars["esi_aws_admin_subnet_2"] }}'
+      esi_aws_cluster_subnet: '{{ vars["esi_aws_cluster_subnet_2"] }}'
+    when: esi_aws_provision_database_hosts | default(True) | bool
+

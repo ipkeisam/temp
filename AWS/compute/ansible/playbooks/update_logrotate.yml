@@ -1,0 +1,17 @@
+---
+
+# ansible-playbook -i <inventory_file> update_logrotate.yml -e "target_hosts=nodes"
+- hosts: "{{ target_hosts }}"
+  become: yes
+  gather_facts: no
+  
+  tasks:
+
+  - name: Create backup of original /etc/logrotate.conf file
+    shell: mv /etc/logrotate.conf /etc/logrotate.conf.backup
+
+  - name: Copy over new /etc/logrotate.conf file
+    copy:
+      #src: /roles/openshift/files/logrotate.conf
+      src: logrotate.conf
+      dest: /etc/logrotate.conf

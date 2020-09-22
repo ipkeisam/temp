@@ -1,0 +1,63 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+  creationTimestamp: 2019-11-08T16:34:00Z
+  generation: 1
+  labels:
+    k8s-app: cluster-version-operator
+  name: cluster-version-operator
+  namespace: openshift-cluster-version
+  resourceVersion: "148505554"
+  selfLink: /apis/monitoring.coreos.com/v1/namespaces/openshift-cluster-version/prometheusrules/cluster-version-operator
+  uid: 91477507-0245-11ea-b93f-0256df2929df
+spec:
+  groups:
+  - name: cluster-version
+    rules:
+    - alert: ClusterVersionOperatorDown
+      annotations:
+        message: Cluster version operator has disappeared from Prometheus target discovery.
+          Operator may be down or disabled, cluster will not be kept up to date and
+          upgrades will not be possible.
+      expr: |
+        absent(up{job="cluster-version-operator"} == 1)
+      for: 10m
+      labels:
+        severity: critical
+  - name: cluster-operators
+    rules:
+    - alert: ClusterOperatorDown
+      annotations:
+        message: Cluster operator {{ $labels.name }} has not been available for 10
+          mins. Operator may be down or disabled, cluster will not be kept up to date
+          and upgrades will not be possible.
+      expr: |
+        cluster_operator_up{job="cluster-version-operator"} == 0
+      for: 10m
+      labels:
+        severity: critical
+    - alert: ClusterOperatorDegraded
+      annotations:
+        message: Cluster operator {{ $labels.name }} has been degraded for 10 mins.
+          Operator is degraded because {{ $labels.reason }} and cluster upgrades will
+          be unstable.
+      expr: |
+        cluster_operator_conditions{job="cluster-version-operator", condition="Degraded"} == 1
+      for: 10m
+      labels:
+        severity: critical
+    - alert: ClusterOperatorFlapping
+      annotations:
+        message: Cluster operator {{ $labels.name }} up status is changing often.
+          This might cause upgrades to be unstable.
+      expr: |
+        changes(cluster_operator_up{job="cluster-version-operator"}[2m]) > 2
+      for: 10m
+      labels:
+        severity: warning

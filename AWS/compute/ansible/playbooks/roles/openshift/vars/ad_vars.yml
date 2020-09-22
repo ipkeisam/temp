@@ -1,0 +1,26 @@
+ocp_atm_id: BB00000085
+
+dev_zone: FT_DEV
+qa_zone: FT_AT
+prod_zone: CPZ_PRD
+
+app_atm_id: ''
+
+
+admin_role: admin
+editor_role: edit
+viewer_role: view
+
+application_roles: 
+  admin:
+    name: Admin
+    role: admin
+
+  editor:
+    name: Editor
+    role: edit
+
+  viewer:
+    name: Viewer
+    role: view
+      

@@ -1,0 +1,21 @@
+kind: LDAPSyncConfig
+apiVersion: v1
+url: ldaps://adds.cguser.capgroup.com
+insecure: false
+bindDN: 'CGUSER\{{ ad_service_account }}'
+bindPassword: "{{ ad_serviceaccount_password }}"
+ca: /root/ad-sync/capgroup_root_ca.cer
+augmentedActiveDirectory:
+  groupsQuery:
+    derefAliases: never
+    pageSize: 0
+  groupUIDAttribute: dn
+  groupNameAttributes: [ cn ]
+  usersQuery:
+    baseDN: "DC=cguser,DC=capgroup,DC=com"
+    scope: sub
+    derefAliases: never
+    pageSize: 0
+    filter: (objectclass=person)
+  userNameAttributes: [ sAMAccountName ]
+  groupMembershipAttributes: [ "memberOf:1.2.840.113556.1.4.1941:" ]

@@ -1,0 +1,35 @@
+---
+
+###
+# start of block for dcip us-west-1
+###
+
+dcip_aws_ppmc_id: "80052" 
+
+dcip_aws_env_type: dev
+
+dcip_aws_env_name: dcip_dev
+
+dcip_aws_ssh_key_name: dcip-admin
+dcip_aws_rootenc_ami: ami-e9e6f489
+dcip_aws_volume_kms_key_id: af2dffbb-ff51-47a8-9728-5d4cfeb004e9
+
+dcip_aws_clusterid: DCIP
+dcip_aws_region: us-west-1
+
+# define ami image to use
+dcip_aws_ec2_database_ami: 
+dcip_aws_ec2_app_ami:
+
+# define instance types
+dcip_aws_ec2_database_instance_type: m5.2xlarge
+dcip_aws_ec2_app_instance_type: m4.large
+
+# subnet information
+dcip_aws_admin_subnet_1: 
+  - { subnet: subnet-62028a39, az: us-west-1c, count: 1 }
+
+###
+# end of block for dcip us-west-1
+###  
+

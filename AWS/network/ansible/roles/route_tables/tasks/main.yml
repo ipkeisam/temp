@@ -1,0 +1,104 @@
+---
+#create route-tables and associate subnets to them
+- name: setfact private subnets id list
+  set_fact:
+    private_subnets_id: "{{private_subnets_id | default([]) + [item.value]}}"
+  with_dict: "{{vpc_private_subnets_id}}"
+
+#- debug:
+#    msg:  "{{item}}"
+#  with_items: "{{private_subnets_id}}"
+
+- name: Set up private subnet route table
+  ec2_vpc_route_table:
+    vpc_id: "{{vpcid}}"
+    region: "{{aws_region}}"
+    aws_access_key: "{{aws_access_key}}"  
+    aws_secret_key: "{{aws_secret_key}}"
+    tags:
+      Name: "private_route-{{aws_region}}"
+      usage-id:     "{{subnet_usage_id}}"
+      sec-profile:  "{{sec_profile}}"
+      exp-date:     "{{exp_date}}"
+      sd-period:    "{{sd_period}}"
+      cloud-dependency: "{{cloud_dependency}}"
+      atm-id:       "{{subnet_atm_id}}"
+      p-id:         "{{subnet_p_id}}"
+      cost-center:  "{{subnet_cost_center}}"
+      env-type:     "{{subnet_env_type}}"
+    subnets: "{{private_subnets_id}}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{vgw_id}}"
+  when:  direct_connect   
+
+# The NAT gateways are created with Availability zones in mind. 
+# A subnet that needs internet access will be associated with it's Zones NAT gateway. 
+# If a subnet needs internet egress do the following. 
+#   1. Lookup the subnet id based on readable name. 
+#   2. Determine the Availability Zone of the looked up private subnet. 
+#   3. Lookup NAT gateway based on Private Subnet's AZ from the "vpc_nat_gateways_by_az" list. 
+#   4. Associate the private subnet with that lookedup NAT gateway ID. 
+- name: "Create routing table when VPC only has northbound internet access and no south bound connection to CG."
+  ec2_vpc_route_table:
+    vpc_id: "{{vpcid}}"
+    region: "{{aws_region}}"
+    aws_access_key: "{{aws_access_key}}"  
+    aws_secret_key: "{{aws_secret_key}}"
+    tags:
+      Name: "private_route-{{aws_region}}-{{item.value.az_name}}"
+      usage-id:     "{{subnet_usage_id}}"
+      sec-profile:  "{{sec_profile}}"
+      exp-date:     "{{exp_date}}"
+      sd-period:    "{{sd_period}}"
+      cloud-dependency: "{{cloud_dependency}}"
+      atm-id:       "{{subnet_atm_id}}"
+      p-id:         "{{subnet_p_id}}"
+      cost-center:  "{{subnet_cost_center}}"
+      env-type:     "{{subnet_env_type}}"
+    purge_routes: "true" 
+    purge_subnets: "false"  
+    subnets: "{{ vpc_private_subnets_id['subnet' + item.value.cnt + '-' + item.value.sname + '-' + item.value.az_name + '-' + env_type] }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ vpc_nat_gateway_ids_by_az[item.value.az_name] }}"
+  with_dict:  "{{vpc_private_subnets}}"        
+  when: (item.value.internet_egress is defined) and (vpc_nat_gateway_ids_by_az|length > 0) and (vpc_nat_gateway_ids_by_az[item.value.az_name] is defined)
+
+- name: set fact public subnets id list
+  set_fact:
+    public_subnets_id: "{{public_subnets_id | default([]) + [item.value]}}"
+  with_dict: "{{vpc_public_subnets_id}}"
+  when: public_facing
+
+- debug:
+    msg:  "{{item}}"
+  with_items: "{{public_subnets_id}}"
+  when: public_facing
+
+- name: Set up public subnet route table
+  ec2_vpc_route_table:
+    vpc_id: "{{vpcid}}"
+    region: "{{aws_region}}"
+    aws_access_key: "{{aws_access_key}}"  
+    aws_secret_key: "{{aws_secret_key}}"
+    tags:
+      Name: "public_route-{{aws_region}}"
+      usage-id:     "{{subnet_usage_id}}"
+      sec-profile:  "{{sec_profile}}"
+      exp-date:     "{{exp_date}}"
+      sd-period:    "{{sd_period}}"
+      cloud-dependency: "{{cloud_dependency}}"
+      atm-id:       "{{subnet_atm_id}}"
+      p-id:         "{{subnet_p_id}}"
+      cost-center:  "{{subnet_cost_center}}"
+      env-type:     "{{subnet_env_type}}"
+    subnets: "{{public_subnets_id}}"
+    routes:
+      - dest: "0.0.0.0/0"
+        gateway_id: "{{vpc_igw_gateway_id}}"
+  when: public_facing
+
+
+
+

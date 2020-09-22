@@ -1,0 +1,5 @@
+---
+# this playbook is used to create subnets only - assuming that vpc already exists. 
+- hosts: vpc_dcipenv1
+  roles:
+  - subnet

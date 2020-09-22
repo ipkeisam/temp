@@ -1,0 +1,4 @@
+---
+
+hosts: '{{ hosts_value }}'
+my_region: '{{ aws_region }}'

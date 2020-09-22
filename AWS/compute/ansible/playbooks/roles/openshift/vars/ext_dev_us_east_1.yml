@@ -1,0 +1,121 @@
+---
+
+###
+# start of block for External Dev East1 
+###
+openshift_aws_ssh_key_name: ocp-ext-dev-us-east-1
+openshift_aws_rootenc_ami: ami-004898145a21e234b
+openshift_aws_volume_kms_key_id: 9a1b2c06-9831-40b2-a227-a98c090c08a0
+openshift_aws_s3_kms_key_id: eea57ffb-c5eb-495e-bb7a-f0b33d024c7c
+
+openshift_aws_clusterid: vpc1_extdev-us-east-1-ext-dev
+openshift_aws_region: us-east-1
+openshift_aws_env_type: dev
+
+# define instance types
+openshift_aws_ec2_control_instance_type: t3.medium
+openshift_aws_ec2_master_instance_type: m5.2xlarge
+openshift_aws_ec2_app_instance_type: m5.2xlarge
+openshift_aws_ec2_infra_instance_type: m5.2xlarge
+
+# misc flags
+openshift_aws_dual_nic: False
+openshift_aws_external_facing: True
+nvme: true
+
+# subnet information
+openshift_aws_control_host_subnet: 
+  - { admin_subnet: subnet-9ebb4ef9, az: us-east-1a } 
+
+openshift_aws_admin_subnet_1: 
+  - { subnet: subnet-9ebb4ef9, az: us-east-1a, count: 1 }
+openshift_aws_admin_subnet_2:
+  - { subnet: subnet-087c6427, az: us-east-1b, count: 1 }
+openshift_aws_admin_subnet_3:
+  - { subnet: subnet-ae17b4e4, az: us-east-1c, count: 1 }
+
+
+#OCPRouter
+# External 1 & 2
+openshift_elb_externalsubnets: 
+  - subnet-b4bd48d3
+  - subnet-866971a9
+  - subnet-aa18bbe0
+
+openshift_elb_internalsubnets:
+  - subnet-2aa4514d
+  - subnet-5a7e6675
+  - subnet-e319baa9
+
+# openshift tagging
+# Key: kubernetes.io/cluster/cluster-EXT-DEV
+# Value: dev1-useast1
+openshift_aws_kubernetes_tag_id: dev1-useast1
+
+openshift_aws_resource_tags:
+  Name: "{{ openshift_aws_resource_type }}"
+  usage-id: "{{ openshift_aws_atm_id }}"
+  cost-center: "{{ openshift_aws_cost_center }}"
+  sec-profile: normal
+  exp-date: 99-00-9999
+  sd-period: na
+  ppmc-id: "{{ openshift_aws_ppmc_id }}"
+  env-type: "{{ openshift_aws_env_type }}"
+  cloud-dependency: cloudonly
+  app-type: "{{ openshift_aws_resource_type }}"
+  kubernetes.io/cluster/cluster-EXT-DEV: "{{ openshift_aws_kubernetes_tag_id }}"
+  site: aws
+  toc: ETOC
+
+#
+# the following section contains variables to create the inventory configuration file
+#
+# define the internal master hostname
+# ex. ocp-console-int.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_internal_master_vip: ocp-console-int.dev-ext-use1-aws.csp.capgroup.com
+# define the master hostname: 
+# ex. ocp-console<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com 
+openshift_aws_master_vip: ocp-console.dev-ext-use1-aws.csp.capgroup.com
+# define the the default master subdomain
+# ex. apps.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_router_vip: apps.dev-ext-use1-aws.csp.capgroup.com
+# define the EBS availability zone for loggging
+# ex. us-west-1a 
+openshift_aws_logging_ebs_zone: us-east-1a
+# define the EBS availability zone for metrics
+# ex. us-west-1c 
+openshift_aws_metric_ebs_zone: us-east-1b
+# define the s3 bucket name
+# ex. ocp-capgroup-<project name>-<env>-<region>
+openshift_aws_s3_bucket_name: ocp-capgroup-ext-dev-east1
+openshift_aws_s3_bucket_name2: 
+openshift_aws_s3_bucket_region: "{{ openshift_aws_region }}"
+openshift_aws_cluster_name: "{{ openshift_aws_kubernetes_tag_id }}" 
+
+openshift_aws_env: ext-dev-useast-1
+openshift_dual_nic: False
+openshift_create_and_copy_cluster_conf: True
+openshift_create_policies: True
+openshift_copy_policies: True
+openshift_configure_iptables: True
+openshift_aws_s3_access_key: AKIAIXFDSQWQKBOISW7A
+openshift_aws_s3_secret_key: 
+openshift_aws_ec2_access_key: AKIAI75P672CKWLNMYAQ
+openshift_aws_ec2_secret_key: 
+
+#AWS Resource Name
+aws_controlhost_type: OCP Control Host
+aws_masterhost_type: OCP Master Host
+aws_infrahost_type: OCP Infra Host
+aws_apphost_type: OCP App Host
+aws_loadbalancer_type: OCP Load Balancer
+
+aws_master_elb_name: OCP-Master-ELB
+aws_internalmaster_elb_name: OCP-InternalMaster-ELB
+aws_internalrouter_elb_name: OCP-InternalRouter-ELB
+aws_router_elb_name: OCP-Router-ELB
+
+
+#Outcold Tag
+outcold_cluster_tag_key: dev-ext-use1-aws.cluster
+outcold_appnode_tag_key: dev-ext-use1-aws.appnode

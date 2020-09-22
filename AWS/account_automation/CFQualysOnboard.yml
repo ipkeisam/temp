@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Dome9 Onboarding for a new account
+Parameters:
+  sourceBucket:
+    Default: na  
+    Type: String
+  QualysBaseUrl:
+    Default:  na
+    Description: Base URL of the Qualys Server
+    Type: String
+  QualysRoleName:
+    Default: na
+    Description: Name of the Role to Create
+    Type: String
+  QualysSecretName:
+    Default: na
+    Description: Name of the secret in Secret Manager storing Qualys credentials
+    Type: String
+  SecretsManagerRegion:
+    Default: na
+    Type: String
+Resources:
+  LFQualysOnboard:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          BASEURL: !Ref QualysBaseUrl
+          ROLENAME: !Ref QualysRoleName
+          QUALYSSECRETNAME: !Ref QualysSecretName
+          SMREGIONNAME: !Ref SecretsManagerRegion
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "acctautomation/LFEnableQualys.zip"
+        S3ObjectVersion: "6JqxMjUaFE3vZ3sgiyG8wHUWmCGKw25a"
+      Description: Lambda Function to Register Qualys AWS EC2 Connector and Create associated Role
+      Handler: LFEnableQualys.lambda_handler
+      Role: !GetAtt 'LFQualysOnboardRole.Arn'
+      Runtime: python3.8
+      Layers: 
+        - arn:aws:lambda:us-east-1:848721808596:layer:http-requests:2
+      Timeout: '90'
+  LFQualysOnboardLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFQualysOnboard
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFQualysOnboard
+      RetentionInDays: 14
+  LFQualysOnboardRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AccountVending-LFQualysOnboardRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: LFQualysOnboardPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:ListAccountAliases
+                  - secretsmanager:GetSecretValue
+                  - kms:Decrypt
+                  - sts:AssumeRole
+                Resource: '*'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AWSOrganizationsFullAccess'
+
+Outputs:
+  LFQualysOnboardArn:
+    Value: !GetAtt LFQualysOnboard.Arn

@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Auto Tagging Template.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Parameters for the default mandatory tags to be applied to all resources provisioned within the account
+        Parameters:
+          - costcenter
+          - envtype
+          - expdate
+          - ppmcid
+          - toc
+          - usageid
+          - sdperiod
+      - Label:
+          default: Account ID of the AWS account
+        Parameters:
+          - accountid
+      - Label:
+          default: Baseline resources used for auto-tagging
+        Parameters:
+          - autotagregion
+          - sourcebucket
+          - lambdafucntionarn
+
+Parameters:
+
+  costcenter:
+    Description: "Cost Center"
+    Type: String
+    ConstraintDescription: "Must provide a valid cost center"
+
+  envtype:
+    Description: "Account Environment "
+    Default: ftdev
+    Type: String
+    AllowedValues:
+      - ftdev
+      - lab
+      - dev
+      - qa
+      - prod
+    ConstraintDescription: "Provide a valid environment type"
+
+  expdate:
+    Description: "Expiration date for the resources to be provisioned within the account if applicable"
+    Default: 99-00-9999
+    Type: String
+
+  ppmcid:
+    Description: "PPMC ID to be used"
+    Type: String
+
+  toc:
+    Description: "TOC"
+    Type: String
+
+  usageid:
+    Description: "Usage ID"
+    Type: String
+
+  sdperiod:
+    Description: "SD Period"
+    Default: 'na'
+    Type: String
+
+  accountid:
+    Description: "Account ID"
+    Type: String
+    MinLength: 12
+    MaxLength: 12
+    ConstraintDescription: "Must provide a valid 12 digit account id"
+
+  autotagregion:
+    Description: "Region within master account from where auto-tagging of member account is executed."
+    Default : "us-west-1"
+    Type: String
+
+  sourcebucket:
+    Description: "Source bucket where lambda function zip file is stored."
+    Default : "organization-cftemplates"
+    Type: String
+
+  lambdafucntionarn:
+    Description: "ARN of the lambda function which creates the stackset and deploys the auto-tagging stacks to the member account."
+    Default : "arn:aws:lambda:us-west-1:848721808596:function:LFAutoTaggingLambda"
+    Type: String
+
+Resources:
+
+  TriggerLambda:
+    Type: "Custom::TriggerLambda"
+    DeletionPolicy: Retain
+    Properties:
+      ServiceToken: !Ref lambdafucntionarn
+      costcenter: !Ref costcenter
+      envtype: !Ref envtype
+      expdate: !Ref expdate
+      ppmcid: !Ref ppmcid
+      toc: !Ref 'toc'
+      usageid: !Ref 'usageid'
+      sdperiod: !Ref sdperiod
+      autotagregion: !Ref autotagregion
+      accountid: !Ref accountid

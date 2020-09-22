@@ -1,0 +1,98 @@
+---
+
+# query info for reference ( vpcout, subnetout, securitygroupout )
+#- include_tasks: query_vpc_subnet_sg.yml
+
+- name: create the control host instance 
+  ec2:
+    region: "{{ openshift_aws_region }}"
+    key_name: "{{ openshift_aws_ssh_key_name }}"
+    instance_type: "{{ openshift_aws_ec2_control_instance_type }}"
+    vpc_subnet_id: "{{ item.admin_subnet }}"
+    image: "{{ openshift_aws_rootenc_ami }}"
+    volumes: "{{ openshift_aws_control_instance_root_volume }}"
+    termination_protection: "{{ openshift_aws_ec2_termination_protection }}"
+    group: 
+      - "{{ openshift_aws_clusterid }}_ocp_control_sg"
+      - "{{ openshift_aws_clusterid }}_ocp_app_sg"
+#    user_data: "{{ openshift_aws_ec2_control_user_data }}"
+    private_ip: "{{ openshift_aws_ec2_control_private_ip | default(omit) }}"
+    wait: yes
+    count: 1
+    instance_tags: "{{ openshift_aws_resource_tags }}"
+  register: control_host
+  with_items: "{{ openshift_aws_control_host_subnet }}"
+
+- debug:
+    msg: "{{ control_host }}"
+
+- name: fetch newly created instance
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+#      "tag:Name": "{{ openshift_aws_resource_type }}"
+      "tag:app-type": "{{ openshift_aws_resource_type }}"
+      instance-state-name: running
+      instance-id: "{{ control_host.results[0].instance_ids }}"      
+  register: instancesout
+  retries: 20
+  delay: 3
+  until: instancesout.instances|length > 0
+
+- debug:
+   msg: "{{ instancesout }}"
+
+# create an eth1 and attach to the instance
+- name: create eth1 for control host
+  ec2_eni:
+    device_index: 1
+    description: ocp-control-host-eth1
+    region: "{{ openshift_aws_region }}"
+    subnet_id: "{{ item.cluster_subnet }}"
+    instance_id: "{{ instancesout.instances[0].instance_id }}"
+    private_ip_address: "{{ openshift_aws_ec2_control_private_ip_eth1 | default(omit) }}"
+    attached: true
+    delete_on_termination: true
+    security_groups:
+      - "{{ openshift_aws_clusterid }}_ocp_control_sg"
+    state: present
+  register: control_host_eth1
+  with_items: "{{ openshift_aws_control_host_subnet }}"
+  when: openshift_aws_dual_nic
+  
+- debug:
+    msg: "{{ control_host_eth1 }}"
+
+# the following tasks tags all related resources attached to the control instance
+- name: tag eth0 network interfaces
+  ec2_tag:
+    region: "{{ openshift_aws_region}}"
+    resource: "{{ item.network_interfaces[0].network_interface_id }}"
+    state: present
+    tags: "{{ openshift_aws_resource_tags }}"
+  with_items: "{{ instancesout.instances }}"
+
+- name: tag eth1 network interfaces
+  ec2_tag:
+    region: "{{ openshift_aws_region}}"
+    resource: "{{ item.interface.id }}"
+    state: present
+    tags: "{{ openshift_aws_resource_tags }}"
+  with_items: "{{ control_host_eth1.results }}"
+  when: openshift_aws_dual_nic
+
+- name: tag attached root volume
+  ec2_tag:
+    region: "{{ openshift_aws_region}}"
+    resource: "{{ item.block_device_mappings[0].ebs.volume_id }}"
+    state: present
+    tags: "{{ openshift_aws_resource_tags }}"
+  with_items: "{{ instancesout.instances }}"
+
+- name: add the newly created control host ip to ocp_hosts.ini file
+  lineinfile:
+    path: "ocp_hosts.ini"
+    insertafter: '^\[control\]'
+    line: "{{ item.private_dns_name }} ansible_connection=ssh ansible_user=ec2-user"
+    state: present
+  with_items: "{{ instancesout.instances }}"

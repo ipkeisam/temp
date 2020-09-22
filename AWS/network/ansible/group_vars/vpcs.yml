@@ -1,0 +1,6 @@
+---
+# Common tags to all vpcs in AWS
+sec_profile:  "normal"
+exp_date:     "99-00-9999"
+sd_period:    "na"
+cloud_dependency: "cloudonly"

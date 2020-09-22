@@ -1,0 +1,398 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "Template to create the Security Groups for the infrastructure.",
+
+  "Metadata": {
+      "Version": "1.0",
+      "LastUpdated": "2017-11-20",
+      "UpdatedBy": "Jim Lentz (jlentz@trace3.com)"
+  },
+
+  "Parameters" : {
+    "vId" : {
+      "Type" : "String",
+      "Description" : "VpcId of the existing Virtual Private Cloud (VPC)"
+    },
+    "StaticCidr" : {
+      "Type" : "String",
+      "Description" : "Internal CIDR block used for management activities"
+    },
+	"VPCCidr" : {
+      "Type" : "String",
+      "Description" : "Internal CIDR block used for management activities"
+    },
+    "Environment" : {
+      "Type" : "String",
+      "Description" : "Environment tag"
+    },
+    "Project" : {
+      "Type" : "String",
+      "Description" : "Project tag"
+    },
+    "EnvStack" : {
+      "Type" : "String",
+      "Description" : "Stack tag"
+    },
+	"DMZExistsA" : {
+	  "Type" : "String",
+	  "Description" : "Does the DMZ Subnet Exist?"
+	},
+	"WebVIPExistsA" : {
+	  "Type" : "String",
+	  "Description" : "Does the Web VIP Subnet Exist?"
+	},
+	"WebExistsA" : {
+	  "Type" : "String",
+	  "Description" : "Does the Web Subnet Exist?"
+	},
+	"AppVIPExistsA" : {
+	  "Type" : "String",
+	  "Description" : "Does the App VIP Subnet Exist?"
+	},
+	"AppExistsA" : {
+	  "Type" : "String",
+	  "Description" : "Does the App Subnet Exist?"
+	},
+	"AdmExistsA" : {
+	  "Type" : "String",
+	  "Description" : "Does the Admin Subnet Exist?"
+	},
+	"AZ": {
+      "Type": "CommaDelimitedList",
+      "Description": "ID of the AvailabilityZone"
+    }
+  },
+  "Conditions" : {
+     "DMZExists": { 
+		  "Fn::Equals": [ {"Ref": "DMZExistsA"}, "True"]
+	 },
+	 "WebVIPExists": { 
+		  "Fn::Equals": [ {"Ref": "WebVIPExistsA"}, "True"]
+	 },
+	 "WebExists": { 
+		  "Fn::Equals": [ {"Ref": "WebExistsA"}, "True"]
+	 },
+	 "AppVIPExists": { 
+		  "Fn::Equals": [ {"Ref": "AppVIPExistsA"}, "True"]
+	 },
+	 "AppExists": { 
+		  "Fn::Equals": [ {"Ref": "AppExistsA"}, "True"]
+	 },
+	 "AdmExists": { 
+		  "Fn::Equals": [ {"Ref": "AdmExistsA"}, "True"]
+	 }
+  },
+  "Resources" : {
+    "AdmTierSg" : {
+	  "Condition": "AdmExists",
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for the admin tier",
+        "VpcId" : { "Ref" : "vId" },
+      "Tags" : [
+          { "Key" : "Environment", "Value" : { "Ref": "Environment" } },
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "EnvStack" }, "adm",{ "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] }, "sg" ]] } }
+        ]
+      }
+    },
+	"DMZTierSg" : {
+	  "Condition": "DMZExists",
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for the DMZ tier",
+        "VpcId" : { "Ref" : "vId" },
+      "Tags" : [
+          { "Key" : "Environment", "Value" : { "Ref": "Environment" } },
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "EnvStack" }, "dmz",{ "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] }, "sg" ]] } }
+        ]
+      }
+    },
+	"WebVIPTierSg" : {
+	  "Condition": "WebVIPExists",
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for the web VIP tier",
+        "VpcId" : { "Ref" : "vId" },
+      "Tags" : [
+          { "Key" : "Environment", "Value" : { "Ref": "Environment" } },
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "EnvStack" }, "webVIP",{ "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] }, "sg" ]] } }
+        ]
+      }
+    },    
+    "WebTierSg" : {
+	  "Condition": "WebExists",
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for the web tier",
+        "VpcId" : { "Ref" : "vId" },
+      "Tags" : [
+          { "Key" : "Environment", "Value" : { "Ref": "Environment" } },
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "EnvStack" }, "web",{ "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] }, "sg" ]] } }
+        ]
+      }
+    },
+	"AppVIPTierSg" : {
+	  "Condition": "AppVIPExists",
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for the admin tier",
+        "VpcId" : { "Ref" : "vId" },
+      "Tags" : [
+          { "Key" : "Environment", "Value" : { "Ref": "Environment" } },
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "EnvStack" }, "appVIP",{ "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] }, "sg" ]] } }
+        ]
+      }
+    },    
+    "AppTierSg" : {
+	  "Condition": "AppExists",
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Security Group for the app tier",
+        "VpcId" : { "Ref" : "vId" },
+      "Tags" : [
+          { "Key" : "Environment", "Value" : { "Ref": "Environment" } },
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "EnvStack" }, "app",{ "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] }, "sg" ]] } }
+        ]
+      }
+    },
+
+
+	"InboundRule1" : {
+	  "Condition": "WebExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "80",
+        "ToPort": "80",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "WebTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule2" : {
+	  "Condition": "WebExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "443",
+        "ToPort": "443",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "WebTierSg", "GroupId" ] }
+      }
+    },
+    "InboundRule3" : {
+	  "Condition": "AppExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "80",
+        "ToPort": "80",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "AppTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule4" : {
+	  "Condition": "AppExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "80",
+        "ToPort": "80",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "AppTierSg", "GroupId" ] }
+      }
+    },
+    "InboundRule5" : {
+	  "Condition": "WebVIPExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "80",
+        "ToPort": "80",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "WebVIPTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule6" : {
+	  "Condition": "WebVIPExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "443",
+        "ToPort": "443",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "WebVIPTierSg", "GroupId" ] }
+      }
+    },
+    "InboundRule7" : {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "443",
+        "ToPort": "443",
+        "CidrIp": "10.31.96.0/20",
+        "GroupId": { "Fn::GetAtt": [ "AdmTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule8" : {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "80",
+        "ToPort": "80",
+        "CidrIp": "10.31.96.0/20",
+        "GroupId": { "Fn::GetAtt": [ "AdmTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule9" : {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "CidrIp": "10.31.96.0/20",
+        "GroupId": { "Fn::GetAtt": [ "AdmTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule10" : {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "443",
+        "ToPort": "443",
+        "CidrIp": "10.91.96.0/20",
+        "GroupId": { "Fn::GetAtt": [ "AdmTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule11" : {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "80",
+        "ToPort": "80",
+        "CidrIp": "10.91.96.0/20",
+        "GroupId": { "Fn::GetAtt": [ "AdmTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule12" : {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "CidrIp": "10.91.96.0/20",
+        "GroupId": { "Fn::GetAtt": [ "AdmTierSg", "GroupId" ] }
+      }
+    },
+    "InboundRule13" : {
+	  "Condition": "AppExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "icmp",
+        "FromPort": "8",
+        "ToPort": "-1",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "AppTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule14" : {
+	  "Condition": "AppVIPExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "icmp",
+        "FromPort": "8",
+        "ToPort": "-1",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "AppVIPTierSg", "GroupId" ] }
+      }
+    },
+    "InboundRule15" : {
+	  "Condition": "AppExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "icmp",
+        "FromPort": "8",
+        "ToPort": "-1",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "AppTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule16" : {
+	  "Condition": "WebVIPExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "icmp",
+        "FromPort": "8",
+        "ToPort": "-1",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "WebVIPTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule17" : {
+	  "Condition": "DMZExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "icmp",
+        "FromPort": "8",
+        "ToPort": "-1",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "DMZTierSg", "GroupId" ] }
+      }
+    },
+	"InboundRule18" : {
+	  "Condition": "WebExists",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "icmp",
+        "FromPort": "8",
+        "ToPort": "-1",
+        "CidrIp": {"Ref" : "VPCCidr"},
+        "GroupId": { "Fn::GetAtt": [ "WebTierSg", "GroupId" ] }
+      }
+    }
+  },
+
+  "Outputs" : {
+    "VPCID": {
+        "Description": "VPC ID of the newly created VPC",
+        "Value": { "Ref": "vId" }
+    },
+	"DMZSgId": {
+	    "Condition": "DMZExists",
+        "Description": "ID of the newly created security group",
+        "Value": { "Ref": "DMZTierSg" }
+    },
+    "AdmSgId": {
+	    "Condition": "AdmExists",
+        "Description": "ID of the newly created security group",
+        "Value": { "Ref": "AdmTierSg" }
+    },
+	"WebVIPSgId": {
+	    "Condition": "WebVIPExists",
+        "Description": "ID of the newly created security group",
+        "Value": { "Ref": "WebVIPTierSg" }
+    },
+    "WebSgId": {
+	    "Condition": "WebExists",
+        "Description": "ID of the newly created security group",
+        "Value": { "Ref": "WebTierSg" }
+    },
+	"AppVIPSgId": {
+	    "Condition": "AppVIPExists",
+        "Description": "ID of the newly created security group",
+        "Value": { "Ref": "AppVIPTierSg" }
+    },
+    "AppSgId": {
+	    "Condition": "AppExists",
+        "Description": "ID of the newly created security group",
+        "Value": { "Ref": "AppTierSg" }
+    }
+  }
+}
+

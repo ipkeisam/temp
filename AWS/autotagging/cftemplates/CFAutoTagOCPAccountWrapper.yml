@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Wrapper Template for Auto Tag OCP Account
+Parameters:
+  AccountCostCenter:
+    Default: 524068  
+    Type: String
+  AccountPPMCId:
+    Default: 69058  
+    Type: String
+  AccountTOC:
+    Default: ETOC
+    Type: String
+  AccountUsageId:
+    Default: BB00000085
+    Type: String
+  AccountExpDate:
+    Default: 99-00-9999  
+    Type: String
+  AccountEnvType:
+    Default: dev
+    AllowedValues:
+      - ftdev
+      - lab
+      - dev
+      - qa
+      - prod
+    Type: String
+  AccountSDPeriod:
+    Default: na  
+    Type: String
+Resources:
+  AutoTagResources:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        AccountCostCenter: !Ref AccountCostCenter
+        AccountPPMCId: !Ref AccountPPMCId
+        AccountTOC: !Ref AccountTOC
+        AccountUsageId: !Ref AccountUsageId
+        AccountExpDate: !Ref AccountExpDate
+        AccountEnvType: !Ref AccountEnvType
+        AccountSDPeriod: !Ref AccountSDPeriod
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: ftdev
+        - Key: sd-period
+          Value: na   
+        - Key: category
+          Value: governance                                               
+      TemplateURL: https://organization-cftemplates.s3-us-west-1.amazonaws.com/CFAutoTagAccount.yml

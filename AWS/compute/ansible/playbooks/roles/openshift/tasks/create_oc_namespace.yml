@@ -1,0 +1,14 @@
+---
+
+- name: Create project
+    openshift_raw:
+      host: "https://{{ openshift_host }}:8443"
+      state: present
+      username: "{{ openshift_username }}"
+      password: "{{ openshift_password }}"
+      verify_ssl: no
+      api_version: v1
+      kind: Project
+      name: test-project
+      description: Test Project
+      display_name: Test Project

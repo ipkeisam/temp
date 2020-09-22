@@ -1,0 +1,107 @@
+---
+
+######## 
+# These playbook is meant for tasks executed after successful install of OCP 
+# It should only be run on the OCP control/bastion host
+# To run:  ansible-playbook -i < inventory cfg file > ocp_node_config.yml
+# 
+# Add or updates the following kubernetes parameter in node-config.yml
+#  image-gc-high-threshold
+#  image-gc-low-threshold
+#  pods-per-core
+#  max-pods ( based on 10 pods per core ) - https://aws.amazon.com/ec2/instance-types/
+#  eviction-hard
+#  eviction-soft 
+#  system-reserved
+#  kube-reserved
+# 
+# To check for current value, run: ansible -i <inventory cfg file> nodes -a "cat /etc/origin/node/node-config.yaml"
+#
+# Instruction:  
+#    To run:
+#      1. Review the playbook and set the proper kubernetes value(s) for each parameter
+#      2. Run playbook: ansible-playbook -i <inventory cfg file> ocp_node_config.yml
+#
+# Example:  ansible-playbook -i int_dev_us_east_1.cfg -e "eh_policy=True" ocp_node_config.yml
+#
+# extra-vars options 
+#  --------------------------------------------------------------------------------------------------------------------
+#  |  variable name           |      value        |    require or optionanl    |     comments
+#  --------------------------------------------------------------------------------------------------------------------
+#  | es_policy                | True or False     | optional ( default False ) | eviction hard policy
+#  ---------------------------------------------------------------------------------------------------------------------
+#  | eh_policy                | True or False     | optional ( default False ) | eviction soft policy      
+#  ---------------------------------------------------------------------------------------------------------------------
+#  | esgp_policy              | True or False     | optional ( default False ) | eviction soft grace period policy            
+#  ---------------------------------------------------------------------------------------------------------------------
+#
+#
+# https://docs.openshift.com/container-platform/3.9/admin_guide/garbage_collection.html
+#
+#  LastUpdated: 2018-09-25
+#  UpdatedBy: Cuong Tong ( cuot@capgroup.com )
+#
+
+- hosts: nodes
+  gather_facts: no
+
+  tasks:
+  - name: set default eviction hard policy if not defined
+    set_fact:
+      eh_policy: False
+    when: eh_policy is undefined
+
+  - name: set default eviction soft policy if not defined
+    set_fact:
+      es_policy: False
+    when: es_policy is undefined
+
+  - name: set default eviction soft grace period policy if not defined
+    set_fact:
+      esgp_policy: False
+    when: esgp_policy is undefined
+
+  # update node configuration
+  - name: Update app node configuration and restart atomic node service
+    import_role:
+      name: openshift
+      tasks_from: update_node_config.yml
+    vars:
+      atomic_service_name: atomic-openshift-node
+      # kubernetes gc parameters
+      new_gc_high_value: 80
+      new_gc_low_value: 75
+      new_max_pod_value: 250
+      new_pods_per_core_value: 10
+      # kubernetes eviction policies
+      new_eh_memory_avail: 500Mi
+      new_es_memory_avail: 500Mi
+      new_esg_memory_avail: 500Mi
+      # kubernetes system and kube resource allocation
+      new_systemd_cpu: 800m     
+      new_systemd_memory: 2Gi
+      new_kube_cpu: 800m
+      new_kube_memory: 1Gi
+
+- hosts: masters[0]
+
+  tasks:
+  - name: Retrieve Openshift version
+    command: oc version
+    register: version_output
+
+  - name: set global variable
+    set_fact:
+      openshift_aws_version: "{{ version_output.stdout_lines }}"
+
+  - name: set default health check playbook to v3.9
+    set_fact:
+      health_check_playbook: "/usr/share/ansible/openshift-ansible/playbooks/openshift-checks/health.yml"
+
+  - name: set health check playbook to use
+    set_fact:
+      health_check_playbook: "/usr/share/ansible/openshift-ansible/playbooks/openshift-checks/health.yml"
+    when: ("v3.10" in version_output.stdout)
+
+  - debug:
+      msg: "Configuration has been updated. Will be executing health checks on cluster. To run manually, run: ansible-playbook -i <inventory_file> {{ health_check_playbook }}"

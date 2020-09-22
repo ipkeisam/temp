@@ -1,0 +1,32 @@
+---
+# tasks file for cg-all-splunk_uf
+
+# this is used later to gate 6 tasks (currently), one if splunk_path.stat.exists=true,
+# and the rest if that's false.
+- name: Checking if splunk is installed at {{ cg.install_directory }}
+  win_stat: 
+    path: '{{ cg.install_directory }}'
+  register: splunk_path
+- fail:
+    msg: splunk is already installed under {{ cg.install_directory }}.
+  when: splunk_path.stat.exists
+
+- name: Creates {{ cg.working_directory }} exists
+  win_file:
+    path: "{{ cg.working_directory }}"
+    state: directory
+
+- name: Download {{ cg.binary }} to {{ cg.install_directory }}
+  win_get_url:
+    url: http://{{ artifact_server }}/pkgdist/windows/splunk_uf/{{ cg.binary }}
+    dest: "{{ cg.working_directory }}"
+  when: splunk_path.stat.exists == false
+
+- name: copy install script to install directory
+  win_template:
+    src: templates/install_splunk.j2
+    dest: "{{ cg.working_directory }}/install_splunk.ps1"
+  when: splunk_path.stat.exists == false
+
+- name: Install splunk on server
+  win_shell: "{{ cg.working_directory }}/install_splunk.ps1"

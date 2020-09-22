@@ -1,0 +1,56 @@
+---
+#####
+#
+# Playbook to subscribe to RHSM 
+# 
+# Instruction:  
+#    To run:
+#      1. Run playbook: ansible-playbook -e "rhsm_user=<rhsm username> rhsm_password=<rhsm password>" rhsm_subscription.yml
+#
+#  LastUpdated: 2019-07-31
+#  UpdatedBy: Randy Liang (randy.liang@capgroup.com)
+#
+- hosts: localhost
+  connection: local
+  
+  tasks:
+    - name: Include vars
+      include_vars:
+        dir: vars
+
+    - name: Register with RHSM
+      redhat_subscription:
+        state: "present"
+        username: "{{ rhsm_user }}"
+        password: "{{ rhsm_password }}"
+      become: yes
+      become_method: sudo
+  
+    - name: Pull latest subscription data from RHSM
+      shell: "subscription-manager refresh"
+      become: yes
+      become_method: sudo      
+    
+    - name: Get pool id
+      shell: "subscription-manager list --available --matches='*OpenShift*' | awk '/Pool ID/ {print $3}' | head -1"
+      register: "pool_id_command"
+      become: yes
+      become_method: sudo
+      
+    - name: Set pool id fact
+      set_fact:
+        "get_pool_id": "{{ pool_id_command.stdout }}"
+
+    - name: Attach pool id to subscription
+      command: "subscription-manager attach --pool={{ get_pool_id }}"
+      become: yes
+      become_method: sudo
+
+    - name: Verify
+      shell: grep "insecure = 0" /etc/rhsm/rhsm.conf
+      tags: verify
+      register: reg_status
+
+    - debug:
+        var: reg_status.stdout_lines
+      tags: verify

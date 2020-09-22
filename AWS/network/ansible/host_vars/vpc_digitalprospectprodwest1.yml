@@ -1,0 +1,206 @@
+---
+#Region 
+aws_region: "us-west-1"
+
+# vpc info - Pre prod
+vpc_name: "vpc1_digiprospect_prod"
+vpc_cidr: "10.21.0.0/22"
+account_name: "digiprospect-prod"       # use AWS account name w/o the AWS in lower case
+
+# Tags values:
+#   vpc tag values
+resource_usage_id: "network"
+atm_id: ""
+p_id: ""
+cost_center: "524035"
+env_type: "digiprospect-prod"
+
+
+#   subnet tag values
+subnet_atm_id: ""
+subnet_p_id: ""
+subnet_cost_center: "524035"
+subnet_env_type: "digiprospect-prod"
+subnet_usage_id: "network-private"    #use "network-public" for public subnet
+
+#AZ-Subnets
+#this section describes all the subnets and set up index and sname(shortname) to form the subnet name later. 
+#changing the field value without "{{value}}" will not require changing script
+#adding more keys will require changing the script
+
+vpc_private_subnets:  
+  private_1:
+    az_name:  "{{aws_region}}a"
+    cblk:     "10.21.1.0/27"
+    cnt:      "1"
+    sname:    "internal-lb"
+    internet_egress:   "required" 
+  private_2:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.1.32/27"
+    cnt:      "2"
+    sname:    "internal-lb"
+    internet_egress:   "required" 
+  private_3:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.1.64/27"
+    cnt:      "3"
+    sname:    "internal-lb"
+    internet_egress:   "required"    
+  private_4:
+    az_name:  "{{aws_region}}a"
+    cblk:     "10.21.1.96/27"
+    cnt:      "4"
+    sname:    "ocpadmin"
+    internet_egress:   "required" 
+  private_5:
+    az_name:  "{{aws_region}}a"
+    cblk:     "10.21.1.128/27"
+    cnt:      "5"
+    sname:    "ocpcluster"
+    internet_egress:   "required"      
+  private_6:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.1.160/27"
+    cnt:      "6"
+    sname:    "ocpadmin"
+    internet_egress:   "required" 
+  private_7:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.1.192/27"
+    cnt:      "7"
+    sname:    "ocpcluster"
+    internet_egress:   "required"      
+  private_8:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.1.224/27"
+    cnt:      "8"
+    sname:    "ocpadmin"
+    internet_egress:   "required" 
+  private_9:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.2.0/27"
+    cnt:      "9"
+    sname:    "ocpcluster"
+    internet_egress:   "required"  
+  private_10:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.2.32/27"
+    cnt:      "10"
+    sname:    "internal"
+    internet_egress:   "required" 
+  private_11:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.2.64/27"
+    cnt:      "11"
+    sname:    "internal"
+    internet_egress:   "required" 
+  private_12:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.2.96/27"
+    cnt:      "12"
+    sname:    "internal"
+    internet_egress:   "required" 
+  private_13:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.2.128/27"
+    cnt:      "13"
+    sname:    "internal"
+    internet_egress:   "required"  
+    
+vpc_public_subnets:     #Public subnets
+  public_1:
+    az_name:  "{{aws_region}}a"
+    cblk:     "10.21.0.0/27"
+    cnt:      "1"
+    sname:    "external_lb" 
+    natgtw:   "required"        
+  public_2:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.0.32/27"
+    cnt:      "2"
+    sname:    "external_lb"
+    natgtw:   "required"     
+  public_3:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.0.64/27"
+    cnt:      "3"
+    sname:    "external-lb"   
+  public_4:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.0.96/27"
+    cnt:      "4"
+    sname:    "external_bastion"
+  public_5:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.21.0.128/27"
+    cnt:      "5"
+    sname:    "external"
+  public_6:
+    az_name:  "{{aws_region}}a"
+    cblk:     "10.21.0.160/27"
+    cnt:      "6"
+    sname:    "external_bastion"
+
+# Security groups - standards for any vpc. Any other security groups needed at a later date can be added here using the same format.
+vpc_security_groups:
+  - name: dp-sg-allow-access-to-bastion
+    description:  "Allow users to RDP/SSH to Bastion hosts"   # RDP and SSH are allowed
+    rules:
+      - proto:  "tcp"
+        cidr_ip:   "0.0.0.0/0"     #wide open but this needs to be narrowed down to user specific ips
+        ports:
+          - 22
+          - 3389
+    rules_egress: 
+      - proto:  "all"
+        cidr_ip: 
+          - "10.0.0.0/8"
+        ports:  "all"
+
+  - name: dp-sg-allow-access-bastion-to-subnets
+    description:  "Enables RDP/SSH access to subnets"   # RDP and SSH to all subnets. For OCP this SG should not be applied.
+    rules:
+      - proto:  "tcp"
+        cidr_ip:   
+          - "10.21.0.96/27"     #Allow bastion hosts to reach into all subnets
+          - "10.21.0.160/27"     #Allow bastion hosts to reach into all subnets
+        ports:
+          - 22
+          - 3389
+    rules_egress: ""
+
+  - name: dp-sg-allow-http(s)-access-to-web
+    description:  "Allow HTTP(S) access to the internet."   # allows https traffic out. 
+    rules: ""
+    rules_egress:
+      - proto:  "tcp"
+        cidr_ip:   
+          - "0.0.0.0/0"     #Allow servers to reachout to any web url.
+        ports:
+          - 80
+          - 443
+
+#Gateways options:
+public_facing: "true"      # Does this VPC allow Internet facing traffic and contain public subnet
+direct_connect: "false"      # Does this VPC connect to CG via DirectConnect 
+VPN_connect:    "false"     # This should be false if using direct connect instead
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
+
+
+

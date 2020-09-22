@@ -1,0 +1,40 @@
+---
+
+###
+# start of block for xpressfeed us-west-1
+###
+
+xpressfeed_aws_ppmc_id: "80052"
+
+xpressfeed_aws_env_type: prd
+
+xpressfeed_aws_env_name: "XpressFeed PRD"
+
+xpressfeed_aws_ssh_key_name: xpressfeed_prod_admin
+xpressfeed_aws_volume_kms_key_id: 2080c149-e9fe-4a39-8094-b65e5a74603c
+
+# define ami image to use
+xpressfeed_aws_rootenc_ami: ami-0ff2291e69817c67d
+xpressfeed_aws_win2016_rootenc_ami: ami-08cbb6e1c56874a88
+xpressfeed_aws_win2012_rootenc_ami: ami-08f9bfad57b680a70
+xpressfeed_aws_win2016_sql2017_rootenc_ami: ami-070b62033394b74c8
+
+xpressfeed_aws_app_security_group_id: [ 'sg-015f6c9b4b9432cfc', 'sg-0e58065ac612c14c3', 'sg-06f3e2b478ac5a5e6' ]
+xpressfeed_aws_db_security_group_id: [ 'sg-015f6c9b4b9432cfc', 'sg-0e58065ac612c14c3', 'sg-06f3e2b478ac5a5e6', 'sg-0980ad03e8a8449ff' ]
+
+xpressfeed_aws_clusterid: vpc2_dcip_prod-us-west-1-dcip_env
+xpressfeed_aws_region: us-west-1
+
+# subnet information
+xpressfeed_aws_admin_subnet_1:
+  - { subnet: subnet-0bdbf74a2dace6dcc, az: us-west-1a, count: 1 }
+xpressfeed_aws_admin_subnet_2:
+  - { subnet: subnet-060fc2c2c25c7e5e0, az: us-west-1b, count: 1 }
+
+xpressfeed_aws_elb_internalsubnets:
+  - subnet-0c95ff8cc6ef858a9
+  - subnet-0a183b541275160de
+
+###
+# end of block for xpressfeed us-west-1
+###

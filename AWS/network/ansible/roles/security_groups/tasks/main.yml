@@ -1,0 +1,21 @@
+---
+#create base security groups
+
+- name: create VPC security groups 
+  ec2_group:
+    name: "{{item.name}}"
+    description: "{{item.description}}"
+    region: "{{aws_region}}"
+    vpc_id: "{{vpcid}}"
+    state:  "present"
+    rules: "{{item.rules}}"
+    #rules_egress: "{{ item.rules_egress | default([]) }}"
+  with_items: "{{vpc_security_groups}}"
+  register: sgs
+  when: vpc_security_groups is defined
+
+
+- debug: var=sgs
+- debug: msg="{{item.group_id}}"
+  with_items: "{{sgs.results}}"
+  when: vpc_security_groups is defined

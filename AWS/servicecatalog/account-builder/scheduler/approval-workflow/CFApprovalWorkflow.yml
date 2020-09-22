@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Approval workflow for Service Catalog product launch
+Metadata:
+  LICENSE: >-
+    Copyright 2017 Amazon Web Services, Inc. or its affiliates. All Rights
+    Reserved. This file is licensed to you under the AWS Customer Agreement (the
+    "License"). You may not use this file except in compliance with the License.
+    A copy of the License is located at http://aws.amazon.com/agreement/ . This
+    file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
+    ANY KIND, express or implied. See the License for the specific language
+    governing permissions and limitations under the License.
+Parameters:
+  EmailID:
+    AllowedPattern: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+    ConstraintDescription: This is not a valid email id.
+    Default: "aws-account-approvals@capgroup.com"
+    Description: Enter Approvers Email ID
+    MaxLength: '64'
+    MinLength: '1'
+    Type: String
+  sourcebucket:
+    Description: "Source bucket where lambda function zip file is stored."
+    Default : na
+    Type: String
+Resources:
+  ApprovalNotificationTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      Subscription:
+        -
+          Endpoint: !Ref EmailID
+          Protocol: email
+      TopicName: "CFNApprovalNotificationTopic"
+  LambdaInvocationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: '/'
+      Policies:
+      - PolicyName: apigateway-lambda-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource: '*'
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: '/'
+      Policies:
+      - PolicyName: lambda-log-sns-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - sns:Get*
+            - sns:List*
+            - sns:Publish
+            Resource: arn:aws:sns:*:*:*
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  ApprovalApi:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Description: 'API for Approving Cloudformation template launch'
+      Name: 'ApprovalAPI'
+      EndpointConfiguration:
+        Types: 
+          - PRIVATE
+        VpcEndpointIds: 
+          - vpce-00b0faecd292a0375
+      Policy:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 'execute-api:Invoke'
+            Resource: 'arn:aws:execute-api:us-east-1:848721808596:*/*'
+          - Effect: Deny
+            Principal: '*'
+            Action: 'execute-api:Invoke'
+            Resource: 'arn:aws:execute-api:us-east-1:848721808596:*/*'
+            Condition:
+              StringNotEquals:
+                'aws:SourceVpce': vpce-00b0faecd292a0375
+  ApproveEvent:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApprovalApi
+      ParentId: !GetAtt ApprovalApi.RootResourceId
+      PathPart: 'approveStack'
+  ApprovalMethod:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApprovalApi
+      ResourceId: !Ref ApproveEvent
+      HttpMethod: 'GET'
+      AuthorizationType: 'NONE'
+      Integration:
+          IntegrationHttpMethod : 'POST'
+          Credentials: !GetAtt LambdaInvocationRole.Arn
+          Type: 'AWS_PROXY'
+          Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApprovalFunction.Arn}/invocations
+  ApprovalWebDeployment:
+    DependsOn: ApprovalMethod
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref ApprovalApi
+      Description: 'approval api deployment'
+      StageName: 'prod'
+  ApprovalFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: LFApprovalFunction.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.8
+      Timeout: 60
+      Layers: 
+        - arn:aws:lambda:us-east-1:848721808596:layer:http-requests:2
+      Code:
+        S3Bucket: !Ref sourcebucket
+        S3Key: "servicecatalog/account-builder/scheduler/approval-workflow/LFApprovalFunction.zip"
+        S3ObjectVersion: "gBTMCa45M5f3V5T_gxFB3T6oDY2Lf8PU"
+  SNSNotificationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: Governance-SNSNotificationLambda
+      Handler: LFSNSNotificationLambda.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.8
+      Environment:
+        Variables:
+          topic_arn: !Ref ApprovalNotificationTopic
+          approval_url: !Sub https://${ApprovalApi}-vpce-00b0faecd292a0375.execute-api.${AWS::Region}.amazonaws.com/prod/approveStack
+      Timeout: 60
+      Layers: 
+        - arn:aws:lambda:us-east-1:848721808596:layer:http-requests:2
+      Code:
+        S3Bucket: !Ref sourcebucket
+        S3Key: "servicecatalog/account-builder/scheduler/approval-workflow/LFSNSNotificationLambda.zip"
+        S3ObjectVersion: "AQFZ.wAb_x8K6hHFZMhO9VSPXpu.q5LA"
+Outputs:
+  LambdaARN:
+    Description: Lambda function ARN to notify approver
+    Value: !GetAtt SNSNotificationLambda.Arn

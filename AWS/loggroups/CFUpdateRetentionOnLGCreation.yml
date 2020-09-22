@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Setup auto-retention of log groups'
+Resources:
+  CWLogRetentionEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: >-
+        Trigger a Lambda function anytime a new CWLog resource is created and update log retention
+      EventPattern:
+        source: 
+          - aws.logs
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - logs.amazonaws.com
+          eventName:
+            - CreateLogGroup
+      Name: New-CWLogRetention-Event
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LFCWLogRetention"
+              - "Arn"
+          Id: "LFCWLogRetentionProduction"
+  LFCWLogRetention:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Description: This function sets the log retention to 14 days to Cloudwatch logs. 
+      Handler: index.lambda_handler 
+      Role: !GetAtt 
+        - CWLogLambdaRetentionRole
+        - Arn
+      Runtime: python3.7 
+      Timeout: '60'
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import boto3
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+
+              try:
+                  region = event['region']
+                  detail = event['detail']
+                  eventname = detail['eventName']
+
+                  logger.info('region: ' + str(region))
+                  logger.info('eventName: ' + str(eventname))
+                  logger.info('detail: ' + str(detail))
+
+                  if not detail['requestParameters']:
+                      logger.warning('No responseElements found')
+                      if detail['errorCode']:
+                          logger.error('errorCode: ' + detail['errorCode'])
+                      if detail['errorMessage']:
+                          logger.error('errorMessage: ' + detail['errorMessage'])
+                      return False
+
+                  cwlogs = boto3.client('logs')
+
+                  if eventname == 'CreateLogGroup':
+                      cwlogsid = detail['requestParameters']['logGroupName']
+                      logger.info(cwlogsid)
+
+                  else:
+                      logger.warning('Not supported action')
+
+                  if cwlogsid:
+                      print('Tagging resource ' + cwlogsid)
+                      response = cwlogs.put_retention_policy(
+                              logGroupName=cwlogsid,
+                              retentionInDays=14
+                      )
+                  return True
+              except Exception as e:
+                  logger.error('Something went wrong: ' + str(e))
+                  return False
+
+  LFCWLogRetentionLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFCWLogRetention
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFCWLogRetention
+      RetentionInDays: 14
+  PermissionForCWLogEventsToInvokeLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: 
+        Ref: LFCWLogRetention
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - CWLogRetentionEventRule
+          - Arn
+  CWLogLambdaRetentionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: CWLogLambdaRetentionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action: 'logs:CreateLogGroup'
+              Resource: 'arn:aws:logs:*:*:*'
+            - Effect: Allow
+              Action:
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+                - 'logs:PutRetentionPolicy'
+                - 'logs:DescribeLogGroups'
+              Resource:
+                - '*'
+Outputs: {}

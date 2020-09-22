@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<udm.DeploymentPackage version="<%CG_BUILD_PKG_ID%>" application="<%CG_APP_NAME%>">
+  <orchestrator />
+  <deployables>
+    <cg.CgPkg name="<%CG_APP_NAME%>-files">
+      <tags />
+      <scanPlaceholders>true</scanPlaceholders>
+      <excludeFileNamesRegex>.+\.(jsp|js|xml|html)$</excludeFileNamesRegex>
+      <fileUri>checksum-http://<%CG_XLD_PKG_REPO%>:8080/bbnas/bb<%CG_BUILD_TYPE%>/<%CG_PROJECT_KEY%>/<%CG_PLAN_NAME%>/<%CG_BUILD_NUMBER%>/dist/package/<%CG_BUILD_PKG_ID%>.zip</fileUri>
+      <targetDirectory>{{DEPLOY_PATH}}</targetDirectory>
+      <atmID><%CG_ATM_ID%></atmID>
+    </cg.CgPkg>
+  </deployables>
+  <applicationDependencies />
+</udm.DeploymentPackage>

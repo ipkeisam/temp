@@ -1,0 +1,7 @@
+#Gather facts about a vpc to be used
+---
+- hosts:
+  - vpc_naddeveast1
+  roles:
+  - get_vpc_facts
+

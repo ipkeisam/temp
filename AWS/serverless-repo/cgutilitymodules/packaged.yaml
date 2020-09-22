@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'utility-modules
+
+  Sample SAM Template for utility-modules
+
+  '
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: CGUtilityModules
+    Description: Utility modules for cloud governance
+    SemanticVersion: 0.0.8
+    ReadmeUrl: s3://organization-repo/sam/41b14e0adeaa8fbbafcb26dccd95e012
+    Author: PlatformDesignTeam
+Resources:
+  UtilityModulesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: cg-utility-modules
+      Description: Utility modules for cloud governance
+      ContentUri: s3://organization-repo/sam/271a4b6d37a8d1f823b2bea33425b8e1
+      CompatibleRuntimes:
+      - python3.7
+      - python3.8
+      RetentionPolicy: Retain
+Outputs:
+  LayerArn:
+    Value:
+      Ref: UtilityModulesLayer

@@ -1,0 +1,392 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "Template to create subnets for a given environment.",
+
+  "Metadata": {
+    "Version": "1.0",
+    "LastUpdated": "2017-12-5",
+    "UpdatedBy": "Jim Lentz (jlentz@trace3.com)"
+  },
+
+  "Parameters": {
+    "AdmCidrs" : {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Admin subnet"
+    },
+    "DMZCidrs" : {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the DMZ subnet"
+    },
+	"WebCidrs" : {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Web subnet"
+    },
+	"WebVipCidrs" : {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Web VIPs subnet"
+	},
+	"AppVipCidrs" : {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the App VIPs subnet"
+	},
+    "AppCidrs" : {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the App subnet"
+    },
+    "Vpc": {
+      "Type": "String",
+      "Description": "ID of the VpcId to modify"
+    },
+	"AZ": {
+      "Type": "CommaDelimitedList",
+      "Description": "ID of the AvailabilityZone"
+    },
+	"DMZPublicIP": {
+      "Type": "String",
+      "Description": "ID of the Public Route Table to associate with the new subnets"
+    },
+    "DMZRoute": {
+      "Type": "String",
+      "Description": "ID of the Public Route Table to associate with the new subnets"
+    },
+	"AdmRoute": {
+      "Type": "String",
+      "Description": "ID of the Admin Route Table to associate with the new subnets"
+    },
+	"WebVIPRoute": {
+      "Type": "String",
+      "Description": "ID of the Web VIP Route Table to associate with the new subnets"
+    },
+	"WebRoute": {
+      "Type": "String",
+      "Description": "ID of the Web Route Table to associate with the new subnets"
+    },
+	"AppVIPRoute": {
+      "Type": "String",
+      "Description": "ID of the App VIP Route Table to associate with the new subnets"
+    },
+	"AppRoute": {
+      "Type": "String",
+      "Description": "ID of the App Route Table to associate with the new subnets"
+    },
+	"DMZAcl": {
+	  "Type": "String",
+	  "Description": "ID of the DMZ ACL"
+	},
+	"WebVIPAcl": {
+	  "Type": "String",
+	  "Description": "ID of the Web VIP ACL"
+	},
+	"WebAcl": {
+	  "Type": "String",
+	  "Description": "ID of the Web ACL"
+	},
+	"AppVIPAcl": {
+	  "Type": "String",
+	  "Description": "ID of the App VIP ACL"
+	},
+	"AppAcl": {
+	  "Type": "String",
+	  "Description": "ID of the App ACL"
+	},
+	"AdmAcl": {
+	  "Type": "String",
+	  "Description": "ID of the Admin ACL"
+	},
+    "Project" : {
+      "Type" : "String",
+      "Description" : "Project tag"
+    },
+    "Environment" : {
+      "Type" : "String",
+      "Description" : "Environment tag"
+    },
+    "EnvStack" : {
+      "Type" : "String",
+      "Description" : "Stack tag"
+    }
+  },
+  "Conditions" : {
+     "DMZExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "DMZCidrs"} ] } , ""
+         ]
+		}
+		]
+     },
+	 "WebVIPExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "WebVipCidrs"} ] } , ""
+         ]
+		}
+		]
+     },
+	 "WebExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "WebCidrs"} ] } , ""
+         ]
+		}
+		]
+     },
+	 "AppVIPExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AppVipCidrs"} ] } , ""
+         ]
+		}
+		]
+     },
+	 "AppExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AppCidrs"} ] } , ""
+         ]
+		}
+		]
+     },
+	 "AdmExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AdmCidrs"} ] } , ""
+         ]
+		}
+		]
+     }
+  },
+
+  "Resources": {     
+    	
+    "DMZSubnet1": {
+      "Condition": "DMZExists",
+	  "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "AvailabilityZone": { "Fn::Select": [ "0", {"Ref": "AZ"} ] },
+        "CidrBlock": { "Fn::Select": [ "0", {"Ref": "DMZCidrs"} ] },
+        "MapPublicIpOnLaunch": { "Ref" : "DMZPublicIP"},
+        "Tags": [
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "Environment" }, "dmz", { "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] } ]] } },
+          { "Key": "Environment", "Value": { "Ref" : "Environment" } },
+          { "Key": "Stack", "Value": { "Ref" : "EnvStack"} }
+        ]
+      }
+    },
+    
+	"WebVipSubnet1": {
+      "Condition": "WebVIPExists",
+	  "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "AvailabilityZone": { "Fn::Select": [ "0", {"Ref": "AZ"} ] },
+        "CidrBlock": { "Fn::Select": [ "0", {"Ref": "WebVipCidrs"} ] },
+        "MapPublicIpOnLaunch": "False",
+        "Tags": [
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "Environment" }, "webvip", { "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] } ]] } },
+          { "Key": "Environment", "Value": { "Ref" : "Environment" } },
+          { "Key": "Stack", "Value": { "Ref" : "EnvStack"} }
+        ]
+      }
+    },
+	"WebSubnet1": {
+	  "Condition": "WebExists",
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "AvailabilityZone": { "Fn::Select": [ "0", {"Ref": "AZ"} ] },
+        "CidrBlock": { "Fn::Select": [ "0", {"Ref": "WebCidrs"} ] },
+        "MapPublicIpOnLaunch": "False",
+        "Tags": [
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "Environment" }, "web", { "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] } ]] } },
+          { "Key": "Environment", "Value": { "Ref" : "Environment" } },
+          { "Key": "Stack", "Value": { "Ref" : "EnvStack"} }
+        ]
+      }
+    },
+	"AppVipSubnet1": {
+	  "Condition": "AppVIPExists",
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "AvailabilityZone": { "Fn::Select": [ "0", {"Ref": "AZ"} ] },
+        "CidrBlock": { "Fn::Select": [ "0", {"Ref": "AppVipCidrs"} ] },
+        "MapPublicIpOnLaunch": "False",
+        "Tags": [
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "Environment" }, "appvip", { "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] } ]] } },
+          { "Key": "Environment", "Value": { "Ref" : "Environment" } },
+          { "Key": "Stack", "Value": { "Ref" : "EnvStack"} }
+        ]
+      }
+    },
+	
+    "AppSubnet1": {
+	  "Condition": "AppExists",
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "AvailabilityZone": { "Fn::Select": [ "0", {"Ref": "AZ"} ] },
+        "CidrBlock": { "Fn::Select": [ "0", {"Ref": "AppCidrs"} ] },
+		"MapPublicIpOnLaunch": "False",
+        "Tags": [
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "Environment" }, "app", { "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] } ]] } },
+          { "Key": "Environment", "Value": { "Ref" : "Environment" } },
+          { "Key": "Stack", "Value": { "Ref" : "EnvStack"} }
+        ]
+      }
+    },
+	"AdmSubnet1": {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "AvailabilityZone": { "Fn::Select": [ "0", {"Ref": "AZ"} ] },
+        "CidrBlock": { "Fn::Select": [ "0", {"Ref": "AdmCidrs"} ] },
+		"MapPublicIpOnLaunch": "False",
+        "Tags": [
+          { "Key" : "Name", "Value" :  { "Fn::Join" : ["-", [ { "Ref" : "Project" }, { "Ref" : "Environment" }, "adm", { "Fn::Select" : [ "2", {"Fn::Split" : [ "-", { "Fn::Select": [ "0", {"Ref": "AZ"} ] }] }] } ]] } },
+          { "Key": "Environment", "Value": { "Ref" : "Environment" } },
+          { "Key": "Stack", "Value": { "Ref" : "EnvStack"} }
+        ]
+      }
+    },
+
+    "RouteTableAssociation1": {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "AdmSubnet1" },
+          "RouteTableId": { "Ref": "AdmRoute" }
+      }
+    },
+	"RouteTableAssociation2": {
+	  "Condition": "DMZExists",
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "DMZSubnet1" },
+          "RouteTableId": { "Ref": "DMZRoute" }
+      }
+    },
+	"RouteTableAssociation3": {
+      "Condition": "WebVIPExists",
+	  "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "WebVipSubnet1" },
+          "RouteTableId": { "Ref": "WebVIPRoute" }
+      }
+    },
+    "RouteTableAssociation4": {
+	  "Condition": "WebExists",
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "WebSubnet1" },
+          "RouteTableId": { "Ref": "WebRoute" }
+      }
+    },
+	"RouteTableAssociation5": {
+	  "Condition": "AppVIPExists",
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "AppVipSubnet1" },
+          "RouteTableId": { "Ref": "AppVIPRoute" }
+      }
+    },
+    "RouteTableAssociation7": {
+	  "Condition": "AppExists",
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "AppSubnet1" },
+          "RouteTableId": { "Ref": "AppRoute" }
+      }
+    },
+
+    "SubnetDev1ToAcl": {
+	  "Condition": "AdmExists",
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "AdmSubnet1" },
+          "NetworkAclId": { "Ref": "AdmAcl" }
+      }
+    },
+	"SubnetDev2ToAcl": {
+	  "Condition": "DMZExists",
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "DMZSubnet1" },
+          "NetworkAclId": { "Ref": "DMZAcl" }
+      }
+    },
+	"SubnetDev3ToAcl": {
+      "Condition": "WebVIPExists",
+	  "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "WebVipSubnet1" },
+          "NetworkAclId": { "Ref": "WebVIPAcl" }
+      }
+    },
+	"SubnetDev4ToAcl": {
+	  "Condition": "WebExists",
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "WebSubnet1" },
+          "NetworkAclId": { "Ref": "WebAcl" }
+      }
+    },
+	"SubnetDev5ToAcl": {
+	  "Condition": "AppVIPExists",
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "AppVipSubnet1" },
+          "NetworkAclId": { "Ref": "AppVIPAcl" }
+      }
+    },
+    "SubnetDev6ToAcl": {
+	  "Condition": "AppExists",
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+          "SubnetId": { "Ref": "AppSubnet1" },
+          "NetworkAclId": { "Ref": "AppAcl" }
+      }
+    }
+  },
+
+  "Outputs": {
+    "VpcId": {
+        "Description": "Id of the modified VPC",
+        "Value": { "Ref": "Vpc" }
+    },
+
+    "SubnetAdm1": {
+	    "Condition": "AdmExists",
+        "Description": "ID of the new admin subnet 1",
+        "Value": { "Ref": "AdmSubnet1" }
+    },
+	"SubnetDMZ1": {
+	    "Condition": "DMZExists",
+        "Description": "ID of the new web subnet 1",
+        "Value": { "Ref": "DMZSubnet1" }
+    },
+    "SubnetVipWeb1": {
+        "Condition": "WebVIPExists",
+		"Description": "ID of the new web subnet 1",
+        "Value": { "Ref": "WebVipSubnet1" }
+    },
+	"SubnetWeb1": {
+	    "Condition": "WebExists",
+        "Description": "ID of the new web subnet 1",
+        "Value": { "Ref": "WebSubnet1" }
+    },
+	"SubnetVipApp1": {
+	    "Condition": "AppVIPExists",
+        "Description": "ID of the new web subnet 1",
+        "Value": { "Ref": "AppVipSubnet1" }
+    },
+    "SubnetApp1": {
+	    "Condition": "AppExists",
+        "Description": "ID of the new app subnet 1",
+        "Value": { "Ref": "AppSubnet1" }
+    }
+  }
+}

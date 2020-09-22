@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy resources (in Master account) for autotagging Route53 resources automation
+Mappings:
+  RegionMap:
+    us-east-1:
+      sourcebucket: organization-repo
+      s3objectversion: mffRyShHMliywaTY2A4oSCqExXrnegH4
+    us-east-2:
+      sourcebucket: organization-repo-e2
+      s3objectversion: A8fFdixURbaFOtlWNamCqm.ges1AFmB6
+    us-west-1:
+      sourcebucket: organization-repo-w1
+      s3objectversion: rgRiwbxeFVDrURy6m7ZGeEOLHkUQjU9n
+    us-west-2:
+      sourcebucket: organization-repo-w2
+      s3objectversion: lcyjhY3RA1t58bOY.o26P4s0mIc9XXJ_
+Resources:
+  Route53EventRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Rule created to trigger a lambda function each time a route53 resource(s) is/are created
+      EventPattern: 
+        source:
+        - aws.route53
+        detail-type:
+        - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+          - route53.amazonaws.com
+          eventName:
+          - CreateHostedZone
+          - CreateHealthCheck
+          - CreateQueryLoggingConfig
+          - CreateReusableDelegationSet
+          - CreateTrafficPolicy
+          - CreateTrafficPolicyInstance
+          - CreateTrafficPolicyVersion
+          - CreateVPCAssociationAuthorization
+          - CreateResolverEndpoint
+          - CreateResolverRule
+      EventBusName: tagging
+      Name: AutoTag-Route53-Event
+      State: ENABLED
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt:
+            - LFAutotagRoute53
+            - Arn
+          Id: LFAutotagRoute53Production
+  LFAutotagRoute53Role:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Role to create Route53 resources
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LFAutotagRoute53Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - route53domains:UpdateTagsForDomain
+                  - route53domains:ListTagsForDomain
+                  - route53resolver:ListTagsForResource
+                  - route53:ListTagsForResource
+                  - route53:ListTagsForResources
+                  - route53:ChangeTagsForResource
+                  - route53resolver:TagResource
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - organizations:ListTagsForResource
+                Resource: "*"
+              - Sid: AssumeOrgRole
+                Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: 'arn:aws:iam::*:role/OrganizationAccountAccessRole'
+  LFAutotagRoute53LG:
+    Type: AWS::Logs::LogGroup
+    DependsOn: LFAutotagRoute53
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ''
+          - - /aws/lambda/
+            - Ref: LFAutotagRoute53
+      RetentionInDays: 14
+  CWToLFRoute53Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      FunctionName:
+        Fn::GetAtt:
+          - LFAutotagRoute53
+          - Arn
+      SourceArn:
+        Fn::GetAtt:
+          - Route53EventRule
+          - Arn
+  LFAutotagRoute53:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Function to tag Route53 resource in response to CloudWatch Events
+      Handler: CFLFAutoTagRoute53.lambda_handler
+      Role: 
+        Fn::GetAtt: 
+          - LFAutotagRoute53Role
+          - Arn
+      Runtime: python3.7
+      Timeout: '60'
+      Code:
+        S3Bucket:
+          !Sub
+            - '${SourceBucket}'
+            - { SourceBucket: !FindInMap [RegionMap, !Ref 'AWS::Region', sourcebucket]}
+        S3Key: "autotagging/CFLFAutoTagRoute53.zip"
+        S3ObjectVersion:
+          !Sub
+            - '${S3ObjectVersion}'
+            - { S3ObjectVersion: !FindInMap [RegionMap, !Ref 'AWS::Region', s3objectversion]}
+Outputs: {}

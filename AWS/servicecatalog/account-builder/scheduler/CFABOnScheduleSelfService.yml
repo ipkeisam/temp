@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Account Builder Template.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Parameters for the newly created account
+        Parameters:
+          - AccountName
+          - AccountType
+          - EnvironmentType
+          - QADataType
+          - OrganizationUnit
+      - Label:
+          default: Network Parameters for the newly created account
+        Parameters:
+          - VPCCIDRBlockEast1
+          - VPCCIDRBlockWest1
+          - VPCCIDRBlockEast2
+          - VPCCIDRBlockWest2
+      - Label:
+          default: Tags to be applied at the account level
+        Parameters:
+          - POC
+          - CostCenter
+          - PPMCId
+          - UsageID
+          - TOC
+          - ShutDownPeriod
+          - ExpiryDate
+          - RemediationGroup
+         
+Parameters:
+
+  AccountName:
+    Description: "Name of the new AWS Account Name, upper case letters, hyphens and numbers"
+    Default : "ACCOUNT-NAME-DEV"
+    Type: String
+    AllowedPattern: "^[A-Z][-A-Z0-9]*$"
+    ConstraintDescription: "Account name can only contain upper case letters, hyphens and numbers"
+
+  AccountType:
+    Description: "Type of account if its managed vs unmanaged"
+    Default : managed
+    Type: String
+    AllowedValues:
+      - managed
+      - unmanaged
+
+  RemediationGroup:
+    Description: "Remediation group to send tickets for unmanaged accounts through ServiceNow"
+    Default : other
+    Type: String
+
+  OrganizationUnit:
+    Description: "Name of the parent organization unit to which the account should be moved to."
+    Default : "CGUSER"
+    Type: String
+    AllowedValues:
+      - FTDEV
+      - LAB
+      - CGUSER
+
+  EnvironmentType:
+    Description: "Type of environment for which the account is being created"
+    Default : "SBX"
+    Type: String
+    AllowedValues:
+      - NA
+      - Foundation
+      - SBX
+      - DEV
+      - QA
+      - PRD
+
+  QADataType:
+    Description: "Applicable only if its a QA account, sensitive vs non-sensitive otherwise choose na"
+    Default : "na"
+    Type: String
+    AllowedValues:
+      - na
+      - non-sensitive
+      - sensitive
+
+  VPCCIDRBlockEast1:
+    Description: "VPC CIDR block for east-1 region, e.g 10.220.6.0/25"
+    Default : "na"
+    Type: String
+
+  VPCCIDRBlockWest1:
+    Description: "VPC CIDR block for west-1 region, e.g 10.220.7.0/25"
+    Default : "na"
+    Type: String
+
+  VPCCIDRBlockEast2:
+    Description: "VPC CIDR block for east-1 region, e.g 10.220.6.0/25"
+    Default : "na"
+    Type: String
+
+  VPCCIDRBlockWest2:
+    Description: "VPC CIDR block for west-1 region, e.g 10.220.7.0/25"
+    Default : "na"
+    Type: String
+
+  POC:
+    Description: "Initials of individual who will be the point of contact for this account. Default will be NA for managed accounts"
+    Default : "NA"
+    Type: String
+    AllowedPattern: "^[A-Z]*$"
+
+  CostCenter:
+    Description: "Cost Center, please enter valid 6 digit number"
+    Type: String
+    AllowedPattern: "^[0-9]{6}$"
+    ConstraintDescription: "Cost Center is a six digit number"
+
+  PPMCId:
+    Description: "PPMC ID, please enter a valid 5 digit number"
+    Type: String
+    AllowedPattern: "^[0-9]{5}$"
+    ConstraintDescription: "PPMC ID is a five digit number"
+
+  UsageID:
+    Description: "Usage ID a.k.a ATM ID, e.g format AA12345678"
+    Type: String
+    AllowedPattern: "^[A-Z]{2}[0-9]{8}$"
+    ConstraintDescription: "Usage ID should be in the format AA12345678 with only upper case letters and numbers"
+
+  TOC:
+    Description: "Technology Oversight Committee. e.g ETOC"
+    Type: String
+    AllowedPattern: "^[A-Z-]*$"
+    ConstraintDescription: "Technology Oversight Committee. e.g ETOC"
+
+  ShutDownPeriod:
+    Description: "Shutdown period in UTC for representing time e.g mon.tue.wed.thu.fri.sat.sun=1430=tue.wed.thu.fri.sat.sun.mon=0200="
+    Default : "na"
+    Type: String
+    AllowedPattern: "^[a-z0-9.=]*$"
+    ConstraintDescription: "Shutdown period should be in the format mon.tue.wed.thu.fri.sat.sun=1430=tue.wed.thu.fri.sat.sun.mon=0200="
+
+  ExpiryDate:
+    Description: "Expiry date should be in the format MM-DD-YYYY e.g 12-25-2022"
+    Default : "99-00-9999"
+    Type: String
+    AllowedPattern: "^[0-9]{2}[-][0-9]{2}[-][0-9]{4}$"
+    ConstraintDescription: "Expiry date should be in the format MM-DD-YYYY e.g 12-25-2022"
+
+Resources:
+
+  TriggerLambda:
+    Type: "Custom::TriggerLambda"
+    DeletionPolicy: Retain
+    Properties:
+      ServiceToken: arn:aws:sns:us-east-1:848721808596:SCAccountBuilderTopic
+      organizationUnitName: !Ref OrganizationUnit
+      accountName: !Ref AccountName
+      accountType: !Ref AccountType
+      remediationGroup: !Ref RemediationGroup
+      environmentType: !Ref EnvironmentType
+      qaDataType: !Ref QADataType
+      vpcCIDRBlocke1: !Ref VPCCIDRBlockEast1
+      vpcCIDRBlockw1: !Ref VPCCIDRBlockWest1
+      vpcCIDRBlocke2: !Ref VPCCIDRBlockEast2
+      vpcCIDRBlockw2: !Ref VPCCIDRBlockWest2
+      costCenter: !Ref CostCenter
+      ppmcID: !Ref PPMCId
+      usageID: !Ref UsageID
+      toc: !Ref TOC
+      shutDownPeriod: !Ref ShutDownPeriod
+      expiryDate: !Ref ExpiryDate
+      poc: !Ref POC

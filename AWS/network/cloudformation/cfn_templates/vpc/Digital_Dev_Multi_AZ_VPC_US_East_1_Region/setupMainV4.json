@@ -1,0 +1,648 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "Template to create a VPC using static routing to an optional VPN endpoint. NOTE: The VPNConnection created will define the configuration for the tunnels to the VPN endpoint using the VPN Gateway configuration from the AWS Management console. There is an option to deploy to one or two availability zones. All subnets are optional. Leave the IP field blank to not create the subnet.",
+
+  "Metadata": {
+      "Version": "1.1",
+      "LastUpdated": "2017-11-16",
+      "UpdatedBy": "Jim Lentz (jlentz@trace3.com)",
+	  "AWS::CloudFormation::Interface" : {
+	    "ParameterGroups": [
+		{
+		  "Label" : {"default" : "Availability Zone Configuration"},
+		  "Parameters" : [
+		    "AvailabilityZone",
+			"NumberOfAvailabilityZones"
+		  ]
+		},
+		{
+		  "Label" : {"default" : "Environment Configuration"},
+		  "Parameters" : [
+		    "Project",
+			"Env",
+			"Stack",
+			"ec2KeyPair",
+			"TemplateUrl"
+		  ]
+		},
+		{
+		  "Label" : {"default" : "Network Configuration"},
+		  "Parameters" : [
+		    "VPCCIDR",
+			"DMZSubnets",
+			"DMZAutoPublicIP",
+			"WebVipSubnets",
+			"WebSubnets",
+			"AppVipSubnets",
+			"AppSubnets",
+			"AdmSubnets",
+			"VPNAddress",
+			"StaticCidrs"
+			]
+		},
+		{
+		  "Label" : {"default" : "Network Configuration for second AZ"},
+		  "Parameters" : [
+		    "VPCCIDR1",
+			"DMZSubnets1",
+			"WebVipSubnets1",
+			"WebSubnets1",
+			"AppVipSubnets1",
+			"AppSubnets1",
+			"AdmSubnets1",
+			"VPNAddress1",
+			"StaticCidrs1"
+			]
+		}
+		],
+		"ParameterLables":{
+		  "AvailabilityZone": {
+		    "default": "Availability Zones"
+		  },
+		  "StaticCidrs": {
+		    "default": "VPN Routes"
+		  }
+		}
+	  }
+  },
+
+  "Parameters": {
+    "VPCCIDR": {
+        "Type": "String",
+        "Description": "VPC CIDR Block.",
+        "MinLength": "9",
+        "MaxLength": "18",
+        "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+        "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x.",
+        "Default" : "10.211.0.0/21"
+    },
+    "NumberOfAvailabilityZones" : {
+	    "Type": "String",
+		"Description": "Number of Availability Zones. 1 or 2",
+		"AllowedValues": ["1", "2"],
+		"Default": "2"
+	},
+    "StaticCidrs": {
+      "Type": "CommaDelimitedList",
+      "Description": "A comma-delimited list of static IPs providing CG On Prem internal network access",
+	  "Default" : "10.0.0.0/8"
+    },
+    "AdmSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Admin tier in the first AZ",
+	  "Default" : "10.211.3.0/24"
+    },
+    "DMZSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the DMZ tier in the first AZ",
+	  "Default" : "10.211.0.0/27"
+    },
+	"DMZAutoPublicIP": {
+	  "Type": "String",
+	  "Description": "Do you want this subnet to auto assign public IP's to new instances?",
+	  "Default": "True",
+	  "AllowedValues" : ["True", "False"]
+	},
+	"WebVipSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Web VIP tier in the first AZ",
+	  "Default" : ""
+    },
+	"WebSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Web tier in the first AZ",
+	  "Default" : "10.211.2.0/25"
+    },
+	"AppVipSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the App VIP tier in the first AZ",
+	  "Default" : ""
+    },
+    "AppSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the App tier in the first AZ",
+	  "Default" : "10.211.2.128/25"
+    },
+	
+	"AdmSubnets1": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Admin tier in the second AZ",
+	  "Default" : "10.211.7.0/24"
+    },
+    "DMZSubnets1": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the DMZ tier in the second AZ",
+	  "Default" : "10.211.4.0/27"
+    },
+	"WebVipSubnets1": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Web VIP tier in the second AZ",
+	  "Default" : ""
+    },
+	"WebSubnets1": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the Web tier in the second AZ",
+	  "Default" : "10.211.6.0/25"
+    },
+	"AppVipSubnets1": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the App VIP tier in the second AZ",
+	  "Default" : ""
+    },
+    "AppSubnets1": {
+      "Type": "CommaDelimitedList",
+      "Description": "CIDR block for the App tier in the second AZ",
+	  "Default" : "10.211.6.128/25"
+    },
+	
+	"AvailabilityZone": {
+       "Description": "List of Availability Zones to use for the subnets in the VPC. Note: The logical order is preserved.",
+       "Type": "List<AWS::EC2::AvailabilityZone::Name>"
+    },
+
+    "Project" : {
+      "Description" : "Project tag",
+      "Type" : "String",
+      "Default" : "cg-digital-dev"
+    },
+    "Env": {
+      "Description" : "Environment tag (nonprod, prod)",
+      "Type" : "String",
+      "Default" : "nonprod"
+    },
+    "Stack": {
+      "Description" : "Stack tag (dev, qa, stg, prd)",
+      "Type" : "String",
+      "Default" : "dev"
+    },
+    "ec2KeyPair": {
+      "Description" : "Amazon EC2 Key Pair",
+      "Type" : "AWS::EC2::KeyPair::KeyName",
+      "Default" : "CG-Digital-Dev-VPC-US-EAST-1"
+    },
+    "TemplateUrl": {
+      "Description" : "S3 bucket from where the CF templates are run",
+      "Type" : "String",
+      "Default" : "https://s3-us-west-2.amazonaws.com/903921672561-cfn-templates/VPC/dev/Digital_Dev_Multi_AZ_VPC_US_East_1_Region/"
+    },
+	"VPNAddress" : {
+      "Type" : "String",
+      "Description" : "IP Address of your VPN device",
+	  "Default" : "148.107.2.2"
+    }
+  },
+
+  "Conditions": {
+	"NVirginiaRegionCondition": {
+        "Fn::Equals": [
+            {
+                "Ref": "AWS::Region"
+            },
+            "us-east-1"
+        ]
+    },
+	"DMZExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "DMZSubnets"} ] } , ""
+         ]
+		}
+		]
+    },
+	"WebVIPExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "WebVipSubnets"} ] } , ""
+         ]
+		}
+		]
+    },
+	"WebExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "WebSubnets"} ] } , ""
+         ]
+		}
+		]
+    },
+	"AppVIPExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AppVipSubnets"} ] } , ""
+         ]
+		}
+		]
+    },
+	"AppExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AppSubnets"} ] } , ""
+         ]
+		}
+		]
+    },
+	"AdmExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AdmSubnets"} ] } , ""
+         ]
+		}
+		]
+    },
+
+
+
+    "DMZExists1": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "DMZSubnets1"} ] } , ""
+         ]
+		}
+		]
+    },
+	"WebVIPExists1": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "WebVipSubnets1"} ] } , ""
+         ]
+		}
+		]
+    },
+	"WebExists1": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "WebSubnets1"} ] } , ""
+         ]
+		}
+		]
+    },
+	"AppVIPExists1": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AppVipSubnets1"} ] } , ""
+         ]
+		}
+		]
+    },
+	"AppExists1": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AppSubnets1"} ] } , ""
+         ]
+		}
+		]
+    },
+	"AdmExists1": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            { "Fn::Select": [ "0", {"Ref": "AdmSubnets1"} ] } , ""
+         ]
+		}
+		]
+    },
+	"VPNExists": {
+        "Fn::Not": [ 
+		 {"Fn::Equals": [
+            {"Ref": "VPNAddress"} , "" ] }
+         ]
+    },
+	"MultiAZExists": {
+        "Fn::Equals": [
+            {"Ref": "NumberOfAvailabilityZones"} , "2"
+         ]
+	}
+  },
+  
+  "Resources": {
+    "npVPC": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+            "EnableDnsSupport": "true",
+            "EnableDnsHostnames": "true",
+            "CidrBlock": { "Ref": "VPCCIDR" },
+            "Tags": [
+                { "Key": "Name", "Value": { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "vpc", { "Ref" : "Env" } ]] } },
+                { "Key": "Environment", "Value": { "Ref": "Env" } },
+                { "Key": "Network", "Value": "VPN Connected VPC" }
+            ]
+        }
+    },
+    "CustomerGateway" : {
+	  "Condition": "VPNExists",
+      "Type" : "AWS::EC2::CustomerGateway",
+      "Properties" : {
+        "Type" : "ipsec.1",
+        "BgpAsn" : "65000", 
+        "IpAddress" : { "Ref" : "VPNAddress" },
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "VPN", "Value" : { "Fn::Join" : ["", ["Gateway to ", {"Ref" : "VPNAddress"}]]}}
+        ]
+      }
+    },
+	"VPNGateway" : {
+	  "Condition": "VPNExists",
+      "Type" : "AWS::EC2::VPNGateway",
+      "Properties" : { 
+        "Type" : "ipsec.1",
+        "Tags" : [{ "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" }}]
+      }
+    },
+    "VPNConnection": {
+	    "Condition": "VPNExists",
+        "Type": "AWS::EC2::VPNConnection",
+        "Properties": {
+            "Type": "ipsec.1",
+            "StaticRoutesOnly": "true",
+            "CustomerGatewayId": { "Ref": "CustomerGateway" },
+            "VpnGatewayId": { "Ref": "VPNGateway" }
+        }
+    },
+    "VPCGatewayAttachment": {
+	    "Condition": "VPNExists",
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+            "VpcId": { "Ref": "npVPC" },
+            "VpnGatewayId": { "Ref": "VPNGateway" }
+        }
+    },
+    "addStaticRoutes": {
+	    "DependsOn": "IGWAttachment",
+        "Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addStaticRoutes.json" ]] },
+            "Parameters": {
+                "ConnectionId": {"Fn::If" :["VPNExists", { "Ref": "VPNConnection" }, "False"]},
+				"VPNGatewayId": {"Fn::If" :["VPNExists", { "Ref": "VPNGateway" }, "False"]},
+				"Env": { "Ref": "Env" },
+				"VpcId": { "Ref": "npVPC" },
+                "CidrList" : { "Fn::Join" : [ ",", { "Ref": "StaticCidrs" } ] },
+				"InternetGateway" : { "Ref": "InternetGateway" },
+				"VpcCider" : { "Ref": "VPCCIDR" },
+				"DMZExistsA" : { "Fn::If" : ["DMZExists", "True", "False"] },
+				"WebVIPExistsA" : { "Fn::If" : ["WebVIPExists", "True", "False"] },
+				"WebExistsA" : { "Fn::If" : ["WebExists", "True", "False"] },
+				"AppVIPExistsA" : { "Fn::If" : ["AppVIPExists", "True", "False"] },
+				"AppExistsA" : { "Fn::If" : ["AppExists", "True", "False"] },
+				"AdmExistsA" : { "Fn::If" : ["AdmExists", "True", "False"] },
+				"ProjectId" : { "Ref" : "Project" },
+				"AZ": { "Fn::Select" : [ "0", { "Ref" : "AvailabilityZone" } ]  }
+            }
+        }
+    },
+	"addStaticRoutes2": {
+	    "Condition": "MultiAZExists",
+        "DependsOn": "IGWAttachment",
+		"Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addStaticRoutes2.json" ]] },
+            "Parameters": {
+                "ConnectionId": {"Fn::If" :["VPNExists", { "Ref": "VPNConnection" }, "False"]},
+				"VPNGatewayId": {"Fn::If" :["VPNExists", { "Ref": "VPNGateway" }, "False"]},
+				"Env": { "Ref": "Env" },
+				"VpcId": { "Ref": "npVPC" },
+                "CidrList" : { "Fn::Join" : [ ",", { "Ref": "StaticCidrs" } ] },
+				"InternetGateway" : { "Ref": "InternetGateway" },
+				"VpcCider" : { "Ref": "VPCCIDR" },
+				"DMZExistsA" : { "Fn::If" : ["DMZExists1", "True", "False"] },
+				"WebVIPExistsA" : { "Fn::If" : ["WebVIPExists1", "True", "False"] },
+				"WebExistsA" : { "Fn::If" : ["WebExists1", "True", "False"] },
+				"AppVIPExistsA" : { "Fn::If" : ["AppVIPExists1", "True", "False"] },
+				"AppExistsA" : { "Fn::If" : ["AppExists1", "True", "False"] },
+				"AdmExistsA" : { "Fn::If" : ["AdmExists1", "True", "False"] },
+				"ProjectId" : { "Ref" : "Project" },
+				"AZ": { "Fn::Select" : [ "1", { "Ref" : "AvailabilityZone" } ]  }
+            }
+        }
+    },
+    "addAcl": {
+        "Type": "AWS::CloudFormation::Stack",
+        "DependsOn": "npVPC",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addACLs.json" ]] },
+            "Parameters": {
+                "VPCID": { "Ref": "npVPC" },
+                "Environment" : { "Ref" : "Env" },
+                "Project" : { "Ref" : "Project" },
+				"DMZExistsA" : { "Fn::If" : ["DMZExists", "True", "False"] },
+				"WebVIPExistsA" : { "Fn::If" : ["WebVIPExists", "True", "False"] },
+				"WebExistsA" : { "Fn::If" : ["WebExists", "True", "False"] },
+				"AppVIPExistsA" : { "Fn::If" : ["AppVIPExists", "True", "False"] },
+				"AppExistsA" : { "Fn::If" : ["AppExists", "True", "False"] },
+				"AdmExistsA" : { "Fn::If" : ["AdmExists", "True", "False"] },
+                "CidrList" : { "Fn::Join" : [ ",", { "Ref": "StaticCidrs" } ] },
+				"AZ": { "Fn::Select" : [ "0", { "Ref" : "AvailabilityZone" } ]  }
+            }
+        }
+    },
+	"addAcl2": {
+	    "Condition": "MultiAZExists",
+        "Type": "AWS::CloudFormation::Stack",
+        "DependsOn": "npVPC",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addACLs2.json" ]] },
+            "Parameters": {
+                "VPCID": { "Ref": "npVPC" },
+                "Environment" : { "Ref" : "Env" },
+                "Project" : { "Ref" : "Project" },
+				"DMZExistsA" : { "Fn::If" : ["DMZExists1", "True", "False"] },
+				"WebVIPExistsA" : { "Fn::If" : ["WebVIPExists1", "True", "False"] },
+				"WebExistsA" : { "Fn::If" : ["WebExists1", "True", "False"] },
+				"AppVIPExistsA" : { "Fn::If" : ["AppVIPExists1", "True", "False"] },
+				"AppExistsA" : { "Fn::If" : ["AppExists1", "True", "False"] },
+				"AdmExistsA" : { "Fn::If" : ["AdmExists1", "True", "False"] },
+                "CidrList" : { "Fn::Join" : [ ",", { "Ref": "StaticCidrs" } ] },
+				"AZ": { "Fn::Select" : [ "1", { "Ref" : "AvailabilityZone" } ]  }
+            }
+        }
+    },
+    "DhcpOptions" : {
+        "Type" : "AWS::EC2::DHCPOptions",
+        "Properties" : {
+            "DomainName" : { 
+			 "Fn::If": [
+                        "NVirginiaRegionCondition",
+                        "ec2.internal",
+                        {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "AWS::Region"
+                                    },
+                                    ".compute.internal"
+                                ]
+                            ]
+                        }
+                    ]
+			},
+            "DomainNameServers" : [ "10.0.0.11, 10.0.0.12" ],
+            "NtpServers" : [ "10.30.2.245, 10.92.6.136, 10.16.5.186" ],
+            "Tags": [
+                { "Key": "Name", "Value" : { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "dhcp-options" ]] } },
+                { "Key": "Environment", "Value": { "Ref": "Env" } }
+            ]
+        }
+    },
+    "DhcpAssociation" : {
+        "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+        "Properties": {
+            "VpcId": { "Ref" : "npVPC" },
+            "DhcpOptionsId": { "Ref" : "DhcpOptions" }
+        }
+    },
+
+
+    "InternetGateway": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+            "Tags": [
+                { "Key": "Environment", "Value": { "Ref": "Env" } },
+                { "Key" : "Name", "Value" : { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "igw", "main", "vpc" ]] } }
+            ]
+        }
+    },
+    "IGWAttachment": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "DependsOn": "InternetGateway",
+        "Properties": {
+            "VpcId": { "Ref": "npVPC" },
+            "InternetGatewayId": { "Ref": "InternetGateway" }
+        }
+    },
+
+
+
+    "addSubnets": {
+        "DependsOn": "addAcl",
+		"DependsOn": "addStaticRoutes",
+		"DependsOn": "IGWAttachment",
+        "Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addSubnets.json" ] ] },
+            "Parameters": {
+				"AdmCidrs": { "Fn::Join" : [ ",", { "Ref" : "AdmSubnets" } ]  },
+                "DMZCidrs": { "Fn::Join" : [ ",", { "Ref" : "DMZSubnets" } ]  },
+				"WebCidrs": { "Fn::Join" : [ ",", { "Ref" : "WebSubnets" } ]  },
+				"WebVipCidrs": { "Fn::Join" : [ ",", { "Ref" : "WebVipSubnets" } ]  },
+				"AppVipCidrs": { "Fn::Join" : [ ",", { "Ref" : "AppVipSubnets" } ]  },
+                "AppCidrs": { "Fn::Join" : [ ",", { "Ref" : "AppSubnets" } ]  },
+                "Vpc": { "Ref" : "npVPC" },
+				"AZ": { "Fn::Select" : [ "0", { "Ref" : "AvailabilityZone" } ]  },
+				"DMZPublicIP": { "Ref": "DMZAutoPublicIP"},
+                "Project" : { "Ref" : "Project" },
+                "Environment" : { "Ref" : "Env" },
+				"AdmRoute": { "Fn::If" : ["AdmExists", {"Fn::GetAtt": ["addStaticRoutes", "Outputs.AdmRoute"] }, ""]},
+				"DMZRoute" : { "Fn::If" : ["DMZExists", { "Fn::GetAtt" : ["addStaticRoutes", "Outputs.DMZRouteTable"] }, ""]},
+				"WebVIPRoute": { "Fn::If" : ["WebVIPExists", { "Fn::GetAtt": ["addStaticRoutes", "Outputs.WebVIPRoute"] }, ""]},
+				"WebRoute": { "Fn::If" : ["WebExists", { "Fn::GetAtt": ["addStaticRoutes", "Outputs.WebRoute"] }, ""]},
+				"AppVIPRoute": { "Fn::If" : ["AppVIPExists", { "Fn::GetAtt": ["addStaticRoutes", "Outputs.AppVIPRoute"] }, ""]},
+				"AppRoute": { "Fn::If" : ["AppExists", { "Fn::GetAtt": ["addStaticRoutes", "Outputs.AppRoute"] }, ""]},
+				"DMZAcl":{ "Fn::If" : ["DMZExists", { "Fn::GetAtt": ["addAcl", "Outputs.DMZAcl"] }, ""]},
+				"WebVIPAcl":{ "Fn::If" : ["WebVIPExists", { "Fn::GetAtt": ["addAcl", "Outputs.WebVIPAcl"] }, ""]},
+				"WebAcl": { "Fn::If" : ["WebExists", { "Fn::GetAtt": ["addAcl", "Outputs.WebAcl"] }, ""]},
+				"AppVIPAcl": { "Fn::If" : ["AppVIPExists", { "Fn::GetAtt": ["addAcl", "Outputs.AppVIPAcl"] }, ""]},
+				"AppAcl": { "Fn::If" : ["AppExists", { "Fn::GetAtt": ["addAcl", "Outputs.AppAcl"] }, ""]},
+				"AdmAcl": { "Fn::If" : ["AdmExists", { "Fn::GetAtt": ["addAcl", "Outputs.AdmAcl"] }, ""]},
+				"EnvStack" : { "Ref" : "Stack" }
+        }
+      }
+    },
+
+	"addSubnets2": {
+        "Condition": "MultiAZExists",
+		"DependsOn": "addAcl",
+		"DependsOn": "addStaticRoutes",
+		"DependsOn": "IGWAttachment",
+        "Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addSubnets2.json" ] ] },
+            "Parameters": {
+				"AdmCidrs": { "Fn::Join" : [ ",", { "Ref" : "AdmSubnets1" }]},
+                "DMZCidrs": { "Fn::Join" : [ ",", { "Ref" : "DMZSubnets1" }]},
+				"WebCidrs": { "Fn::Join" : [ ",", { "Ref" : "WebSubnets1" } ]  },
+				"WebVipCidrs": { "Fn::Join" : [ ",", { "Ref" : "WebVipSubnets1" }]  },
+				"AppVipCidrs": { "Fn::Join" : [ ",", { "Ref" : "AppVipSubnets1" }]  },
+                "AppCidrs": { "Fn::Join" : [ ",", { "Ref" : "AppSubnets1" }]  },
+                "Vpc": { "Ref" : "npVPC" },
+				"AZ": { "Fn::Select" : [ "1", { "Ref" : "AvailabilityZone" } ]  },
+				"DMZPublicIP": { "Ref": "DMZAutoPublicIP"},
+                "Project" : { "Ref" : "Project" },
+                "Environment" : { "Ref" : "Env" },
+				"AdmRoute": { "Fn::If" : ["AdmExists1", {"Fn::GetAtt": ["addStaticRoutes2", "Outputs.AdmRoute"] }, ""]},
+				"DMZRoute" : { "Fn::If" : ["DMZExists1", { "Fn::GetAtt" : ["addStaticRoutes2", "Outputs.DMZRouteTable"] }, ""]},
+				"WebVIPRoute": { "Fn::If" : ["WebVIPExists1", { "Fn::GetAtt": ["addStaticRoutes2", "Outputs.WebVIPRoute"] }, ""]},
+				"WebRoute": { "Fn::If" : ["WebExists1", { "Fn::GetAtt": ["addStaticRoutes2", "Outputs.WebRoute"] }, ""]},
+				"AppVIPRoute": { "Fn::If" : ["AppVIPExists1", { "Fn::GetAtt": ["addStaticRoutes2", "Outputs.AppVIPRoute"] }, ""]},
+				"AppRoute": { "Fn::If" : ["AppExists1", { "Fn::GetAtt": ["addStaticRoutes2", "Outputs.AppRoute"] }, ""]},
+				"DMZAcl":{ "Fn::If" : ["DMZExists1", { "Fn::GetAtt": ["addAcl2", "Outputs.DMZAcl"] }, ""]},
+				"WebVIPAcl":{ "Fn::If" : ["WebVIPExists1", { "Fn::GetAtt": ["addAcl2", "Outputs.WebVIPAcl"] }, ""]},
+				"WebAcl": { "Fn::If" : ["WebExists1", { "Fn::GetAtt": ["addAcl2", "Outputs.WebAcl"] }, ""]},
+				"AppVIPAcl": { "Fn::If" : ["AppVIPExists1", { "Fn::GetAtt": ["addAcl2", "Outputs.AppVIPAcl"] }, ""]},
+				"AppAcl": { "Fn::If" : ["AppExists1", { "Fn::GetAtt": ["addAcl2", "Outputs.AppAcl"] }, ""]},
+				"AdmAcl": { "Fn::If" : ["AdmExists1", { "Fn::GetAtt": ["addAcl2", "Outputs.AdmAcl"] }, ""]},
+				"EnvStack" : { "Ref" : "Stack" }
+        }
+      }
+    },
+	
+    "addSecGrps" : {
+        "DependsOn" : "addSubnets",
+        "Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addSecGrps.json" ] ] },
+            "Parameters": {
+                "vId" : { "Ref" : "npVPC" },
+				"VPCCidr": { "Ref" : "VPCCIDR" },
+                "StaticCidr" : { "Fn::Select": [ "0", {"Ref": "StaticCidrs"} ] },
+                "Environment" : { "Ref" : "Env" },
+                "Project" : { "Ref" : "Project" },
+                "EnvStack" : { "Ref" : "Stack" },
+				"AZ": { "Fn::Select" : [ "0", { "Ref" : "AvailabilityZone" } ]  },
+				"DMZExistsA" : { "Fn::If" : ["DMZExists", "True", "False"] },
+				"WebVIPExistsA" : { "Fn::If" : ["WebVIPExists", "True", "False"] },
+				"WebExistsA" : { "Fn::If" : ["WebExists", "True", "False"] },
+				"AppVIPExistsA" : { "Fn::If" : ["AppVIPExists", "True", "False"] },
+				"AppExistsA" : { "Fn::If" : ["AppExists", "True", "False"] },
+				"AdmExistsA" : { "Fn::If" : ["AdmExists", "True", "False"] }
+            }
+        }
+    },
+	"addSecGrps2" : {
+	    "Condition": "MultiAZExists",
+        "DependsOn" : "addSubnets",
+        "Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addSecGrps.json" ] ] },
+            "Parameters": {
+                "vId" : { "Ref" : "npVPC" },
+				"VPCCidr": { "Ref" : "VPCCIDR" },
+                "StaticCidr" : { "Fn::Select": [ "0", {"Ref": "StaticCidrs"} ] },
+                "Environment" : { "Ref" : "Env" },
+                "Project" : { "Ref" : "Project" },
+                "EnvStack" : { "Ref" : "Stack" },
+				"AZ": { "Fn::Select" : [ "1", { "Ref" : "AvailabilityZone" } ]  },
+				"DMZExistsA" : { "Fn::If" : ["DMZExists1", "True", "False"] },
+				"WebVIPExistsA" : { "Fn::If" : ["WebVIPExists1", "True", "False"] },
+				"WebExistsA" : { "Fn::If" : ["WebExists1", "True", "False"] },
+				"AppVIPExistsA" : { "Fn::If" : ["AppVIPExists1", "True", "False"] },
+				"AppExistsA" : { "Fn::If" : ["AppExists1", "True", "False"] },
+				"AdmExistsA" : { "Fn::If" : ["AdmExists1", "True", "False"] }
+            }
+        }
+    }
+  },
+
+  "Outputs": {
+    "VPCID": {
+        "Description": "VPC ID of the newly created VPC",
+        "Value": { "Ref": "npVPC" }
+    },
+	"VPNConnection": {
+	    "Condition": "VPNExists",
+        "Description": "ID of the VPN Connection",
+        "Value": { "Ref": "VPNConnection" }
+    }
+  }
+}

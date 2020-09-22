@@ -1,0 +1,210 @@
+---
+- fail:
+    msg: "{{ item }} needs to be defined"
+  when: item is not defined
+  with_items:
+  - openshift_aws_s3_access_key
+  - openshift_aws_s3_secret_key
+  - openshift_aws_ec2_access_key
+  - openshift_aws_ec2_secret_key
+
+- name: check if {{ role_path }}/files/{{ openshift_aws_config_file_name }} already exist    
+  stat: 
+    path: "{{ role_path }}/files/{{ openshift_aws_config_file_name }}"
+  register: file_stats
+
+# fetch the master1 ec2 information
+- name: fetch information on master ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_masterhost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_master1_output
+  with_items: "{{ openshift_aws_admin_subnet_1 }}"
+
+- name: set master1 private dns name
+  set_fact:
+    openshift_aws_master1_private_hostname: "{{ ec2_master1_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set master1 private ip address
+  set_fact:
+    openshift_aws_master1_private_ip: "{{ ec2_master1_output.results[0].instances[0].private_ip_address }}"     
+
+# fetch the master2 ec2 information
+- name: fetch information on master ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_masterhost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_master2_output
+  with_items: "{{ openshift_aws_admin_subnet_2 }}"
+
+- name: set master2 private dns name
+  set_fact:
+    openshift_aws_master2_private_hostname: "{{ ec2_master2_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set master2 private ip address
+  set_fact:
+    openshift_aws_master2_private_ip: "{{ ec2_master2_output.results[0].instances[0].private_ip_address }}"     
+
+# fetch the master3 ec2 information
+- name: fetch information on master ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_masterhost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_master3_output
+  with_items: "{{ openshift_aws_admin_subnet_3 }}"
+
+- name: set master3 private dns name
+  set_fact:
+    openshift_aws_master3_private_hostname: "{{ ec2_master3_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set master3 private ip address
+  set_fact:
+    openshift_aws_master3_private_ip: "{{ ec2_master3_output.results[0].instances[0].private_ip_address }}" 
+
+# fetch the infra1 ec2 information
+- name: fetch information on infra ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_infrahost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_infra1_output
+  with_items: "{{ openshift_aws_admin_subnet_1 }}"
+
+- name: set infra1 private dns name
+  set_fact:
+    openshift_aws_infra1_private_hostname: "{{ ec2_infra1_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set infra1 private ip address
+  set_fact:
+    openshift_aws_infra1_private_ip: "{{ ec2_infra1_output.results[0].instances[0].private_ip_address }}"     
+
+# fetch the infra2 ec2 information
+- name: fetch information on infra ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_infrahost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_infra2_output
+  with_items: "{{ openshift_aws_admin_subnet_2 }}"
+
+- name: set infra2 private dns name
+  set_fact:
+    openshift_aws_infra2_private_hostname: "{{ ec2_infra2_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set infra2 private ip address
+  set_fact:
+    openshift_aws_infra2_private_ip: "{{ ec2_infra2_output.results[0].instances[0].private_ip_address }}"     
+
+# fetch the infra3 ec2 information
+- name: fetch information on infra ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_infrahost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_infra3_output
+  with_items: "{{ openshift_aws_admin_subnet_3 }}"
+
+- name: set infra3 private dns name
+  set_fact:
+    openshift_aws_infra3_private_hostname: "{{ ec2_infra3_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set infra3 private ip address
+  set_fact:
+    openshift_aws_infra3_private_ip: "{{ ec2_infra3_output.results[0].instances[0].private_ip_address }}" 
+
+# fetch the app1 ec2 information
+- name: fetch information on app ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_apphost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_app1_output
+  with_items: "{{ openshift_aws_admin_subnet_1 }}"
+
+- name: set app1 private dns name
+  set_fact:
+    openshift_aws_app1_private_hostname: "{{ ec2_app1_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set app1 private ip address
+  set_fact:
+    openshift_aws_app1_private_ip: "{{ ec2_app1_output.results[0].instances[0].private_ip_address }}"     
+
+# fetch the app2 ec2 information
+- name: fetch information on app ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_apphost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_app2_output
+  with_items: "{{ openshift_aws_admin_subnet_2 }}"
+
+- name: set app2 private dns name
+  set_fact:
+    openshift_aws_app2_private_hostname: "{{ ec2_app2_output.results[0].instances[0].private_dns_name }}" 
+
+- name: set app2 private ip address
+  set_fact:
+    openshift_aws_app2_private_ip: "{{ ec2_app2_output.results[0].instances[0].private_ip_address }}"     
+
+# fetch the app3 ec2 information
+- name: fetch information on app ec2 instances
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:app-type': "{{ aws_apphost_type }}"
+      instance-state-name: running
+      subnet-id: "{{ item.subnet }}"
+      availability-zone: "{{ item.az }}"      
+  register: ec2_app3_output
+  with_items: "{{ openshift_aws_admin_subnet_3 }}"
+
+- name: set app3 private dns name
+  set_fact:
+    openshift_aws_app3_private_hostname: "{{ ec2_app3_output.results[0].instances[0].private_dns_name }}" 
+  ignore_errors: True
+
+- name: set app3 private ip address
+  set_fact:
+    openshift_aws_app3_private_ip: "{{ ec2_app3_output.results[0].instances[0].private_ip_address }}" 
+  ignore_errors: True
+
+# populate and create configuration file from template
+- name: create ocp configuration file name {{ openshift_aws_config_file_name }}
+  template:
+    dest: "{{ role_path }}/files/{{ openshift_aws_config_file_name }}"
+    src: "{{ role_path }}/templates/ocp-inventory-template.j2"
+    mode: "u=rw,g=r,o=r"
+    backup: yes
+  when: file_stats.stat.exists == false
+
+- debug:
+    msg: "INFO: {{ role_path }}/files/{{ openshift_aws_config_file_name }} already exist.  Skipping..."
+  when: file_stats.stat.exists == true
+

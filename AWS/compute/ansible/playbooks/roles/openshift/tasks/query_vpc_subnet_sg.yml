@@ -1,0 +1,47 @@
+---
+
+- fail:
+    msg: "{{ item }} needs to be defined"
+  when: item is not defined
+  with_items:
+  - openshift_aws_clusterid
+  - openshift_aws_region
+
+- name: query vpc
+  ec2_vpc_net_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      'tag:Name': "{{ openshift_aws_clusterid }}"
+  register: vpcout
+  
+- name: debug vcpout
+  debug:
+    var: vpcout
+   verbosity: 1
+
+- name: fetch information on OCP subnets
+  ec2_vpc_subnet_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      vpc-id: "{{ vpcout.vpcs[0].id }}"
+  register: subnetout
+
+- name: debug subnetout
+  debug:
+    var: subnetout
+    verbosity: 1
+
+- name: fetch information on all OCP security groups
+  ec2_group_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      vpc-id: "{{ vpcout.vpcs[0].id }}"
+  register: securitygroupout
+
+- name: debug securitygroupout
+  debug:
+    var: securitygroupout
+    verbosity: 1
+
+
+    

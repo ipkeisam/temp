@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Wrapper Template for Auto Tag Lambda Function
+Parameters:
+  sourcebucket:
+    Description: "Source bucket where lambda function zip file is stored."
+    Default : "organization-cftemplates"
+    Type: String
+Resources:
+  AutoTagLambda:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourcebucket: !Ref sourcebucket
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: ftdev
+        - Key: sd-period
+          Value: na   
+        - Key: category
+          Value: governance                                               
+      TemplateURL: https://organization-cftemplates.s3-us-west-1.amazonaws.com/CFAutoTaggingLambda.yml

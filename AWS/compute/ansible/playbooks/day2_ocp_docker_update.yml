@@ -1,0 +1,54 @@
+---
+##### 
+# Update docker version
+#
+# Instruction:
+#  Openshift 3.11 SNX1/SNX2 Prod clusters needs a docker version upgrade on all hosts.
+#  There is an issue with Twistlock where it's unable to scan the container images 
+#  on the host due to an older version of docker.
+#  This playbook upgrades docker version 2:1.13.1-162.git64e9980.el7_8.x86_64 on all host in SNX1/SNX2.
+#  
+#  To run:
+#    1. ansible-playbook -i <inventory file> -e "docker_package=<docker package>" day2_ocp_docker_update.yml 
+#  
+#  Example: ansible-playbook -i ocp-nadqa-west1.cfg day2_ocp_docker_update.yml
+# 
+#  LastUpdated: 2020-07-27
+#  UpdatedBy: Ip Sam ( coniws@capgroup.com )
+#
+- name: Install Docker and Docker Compose
+  hosts: all
+  become: true
+
+  tasks:
+    - fail:
+      msg: "{{ docker_package }} needs to be defined"
+    when: docker_package is undefined
+
+    - name: Install yum utils
+      yum:
+        name: yum-utils
+        state: latest
+
+    - name: Install docker package
+      yum:
+        name: {{ docker_package }}
+        state: latest
+
+    - name: Enable the Docker daemon in systemd
+      systemd:
+        name: docker
+        enabled: yes
+        masked: no
+
+    - name: Start the Docker daemon
+      systemd:
+        name: docker
+        state: started
+        masked: no
+
+    - name: Restart the Atomic OpenShift Node
+      systemd:
+        name: atomic-openshift-node
+        state: restarted
+        masked: no

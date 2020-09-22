@@ -1,0 +1,518 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Tag NonCompliance Stack
+Parameters:
+  ResourceLimit:
+    Default: 25
+    Type: Number
+  AlertSchedule:
+    Default: cron(0 15 ? * MON-FRI *)
+    Type: String
+  LookupEventsStartDateSetHours:
+    Default: 72
+    Type: String
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      configRuleName: OrgConfigRule-OrganizationConfigRuleRequiredTags-vxozqp2z
+    us-east-2: 
+      configRuleName: OrgConfigRule-OrganizationConfigRuleRequiredTags-2umusz0q
+    us-west-1: 
+      configRuleName: OrgConfigRule-OrganizationConfigRuleRequiredTags-xrlbvgoz
+    us-west-2: 
+      configRuleName: OrgConfigRule-OrganizationConfigRuleRequiredTags-fjz9nhp6
+Resources:
+  SFInvokeRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: StepFunctionsInvoke
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'states:StartExecution'
+                Resource: '*'
+  ScheduleCloudWatchTagComplianceRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Schedule that runs every Monday to Friday to check if any resources have missing required tags and sends out an email.
+      Name: TagCompliance-ScheduleRule
+      ScheduleExpression: !Ref AlertSchedule
+      State: ENABLED
+      Targets:
+        - Arn: !Ref SFSMNotifyTagsNonCompliance
+          Id: StateMachineTargetId
+          RoleArn: !GetAtt 
+            - SFInvokeRole
+            - Arn
+  LFTagExtractCloudTrailLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFTagExtractCloudTrail
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFTagExtractCloudTrail
+      RetentionInDays: 14
+  LFTagExtractCloudTrail:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: TagCompliance-LFExtractCloudTrail
+      Description: Extract CloudTrail data for non-compliant resource
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Role: !GetAtt 
+        - LFTagExtractCloudTrailRole
+        - Arn
+      Environment:
+        Variables:
+          Reduce_Hours:
+            Ref: LookupEventsStartDateSetHours
+      Timeout: 300
+      Code:
+        ZipFile: |
+          const aws = require('aws-sdk'); 
+          const cloudtrail = new aws.CloudTrail();  
+          exports.handler = (event, context, callback) => {
+              event.startDate = new Date();
+              event.endDate = new Date();
+              event.finalArrayisEmpty = false;
+              event.startDate.setHours(event.startDate.getHours() - process.env.Reduce_Hours);
+              const setLookupAttributes = {
+                  StartTime: event.startDate,
+                  EndTime: event.endDate,
+                  LookupAttributes: [{
+                      AttributeKey: 'ResourceName',
+                      AttributeValue: event.resourceIDArray.shift()
+                  }],
+                  MaxResults: 1
+              };
+              if (event.resourceIDArray.length > 0) {
+                  event.has_elements = true;
+              } else {
+                  event.has_elements = false;
+              }
+              cloudtrail.lookupEvents(setLookupAttributes, (err, data) => {
+                  if (err) {
+                      return callback(err);
+                  }
+                  var resourceEventName = "";
+                  var resourceUsername = "";   
+                  if(data.Events.length > 0){
+                    event.resourceEventName = data.Events[0].EventName;
+                    event.resourceUsername = data.Events[0].Username;
+                    event.AllResourceEventName.push(event.resourceEventName);
+                    event.AllResourceUsername.push(event.resourceUsername);
+                    event.finalResourceIDArray.push(event.staticResourceIDArray.shift());
+                    event.finalResourceTypeArray.push(event.staticResourceTypeArray.shift());
+                  } else{
+                    event.staticResourceIDArray.shift();
+                    event.staticResourceTypeArray.shift();
+                    event.resourceEventName = "Not Available";
+                    event.resourceUsername = "Not Available";            
+                  }
+                  if(event.finalResourceIDArray.length === 0)
+                    event.finalArrayisEmpty = true;
+                  callback(null,event);
+              });  
+          };
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d5612bf0-f694-410f-b609-7e8c69092c11
+  LFTagGetAccountAliasLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFTagGetAccountAlias
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFTagGetAccountAlias
+      RetentionInDays: 14
+  LFTagGetAccountAlias:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: TagCompliance-LFGetAccountAlias
+      Description: Get Account Alias for account
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Role: !GetAtt 
+        - LFTagGetAccountAliasRole
+        - Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          var aws = require('aws-sdk');
+          var iam = new aws.IAM();
+
+          exports.handler = (event, context, callback) => {
+              var params = {
+              };
+              iam.listAccountAliases(params, (err, data) => {
+                  if (err) {
+                      console.log(err, err.stack); 
+                      event.accountname = "Not Available";
+                      return callback(err);
+                  } else {
+                      event.accountname=data.AccountAliases[0];
+                      console.log("account alias:" + data.AccountAliases[0]);
+                      callback(null,event);
+                  }
+              });
+          };
+  LFTagExtractNoncomplaintResourcesLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFTagExtractNoncomplaintResources
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFTagExtractNoncomplaintResources
+      RetentionInDays: 14
+  LFTagExtractNoncomplaintResources:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: TagCompliance-LFExtractNoncomplaintResources
+      Description: Extract Noncomplaint Resources within the account
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Environment:
+        Variables:
+          Resource_Limit:
+            Ref: ResourceLimit
+          ConfigRuleName: !FindInMap [RegionMap, !Ref 'AWS::Region', configRuleName]
+      Role: !GetAtt 
+        - LFTagExtractNoncomplaintResourcesRole
+        - Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          const aws = require('aws-sdk');  
+          const config = new aws.ConfigService();  
+          var config_params = {
+            ConfigRuleName: process.env.ConfigRuleName, /* required */
+            ComplianceTypes: ['NON_COMPLIANT'],
+            Limit: process.env.Resource_Limit
+          };
+          exports.handler = (event, context, callback) => {
+              event.AllResourceEventName = [];
+              event.AllResourceUsername = [];
+              event.finalResourceIDArray = [];
+              event.finalResourceTypeArray = [];
+              event.accountname = "Not Defined";
+              config.getComplianceDetailsByConfigRule(config_params, (err, data) => {
+                var resource_id = [];
+                var resource_type = [];
+                if (err) {
+                    return callback(err);
+                }
+                else {
+                  const resource_count = data.EvaluationResults.length;
+                  for(var i=0; i < resource_count; i++){
+                    var individual_resource = data.EvaluationResults[i].EvaluationResultIdentifier.EvaluationResultQualifier.ResourceId;
+                    resource_id.push(individual_resource);
+                    var individual_resource_type = data.EvaluationResults[i].EvaluationResultIdentifier.EvaluationResultQualifier.ResourceType;
+                    resource_type.push(individual_resource_type);
+                  }
+                  event.resourceIDArray = resource_id;
+                  event.staticResourceTypeArray = resource_type;
+                  event.staticResourceIDArray = resource_id;
+                  if (event.resourceIDArray.length > 0) {
+                    event.has_elements = true;
+                    event.no_resources_to_tag = false;                    
+                  } else {
+                    event.has_elements = false;
+                    event.no_resources_to_tag = true;
+                  }
+                  callback(null,event);  
+                }
+              });  
+
+          };
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d5612bf0-f694-410f-b609-7e8c69092c11
+  LFTagSendEmailViaSNSLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFTagSendEmailViaSNS
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFTagSendEmailViaSNS
+      RetentionInDays: 14
+  LFTagSendEmailViaSNS:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: TagCompliance-LFSendEmailViaSNS
+      Description: Send email listing resources that are non-compliant
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Environment:
+        Variables:
+          ExecutionRegion:
+            Ref: AWS::Region
+          ExecutionAccountId:
+            Ref: AWS::AccountId
+      Role: !GetAtt 
+        - LFTagSendEmailViaSNSRole
+        - Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          var aws = require('aws-sdk');
+          var sns = new aws.SNS();
+
+          exports.handler = (event, context, callback) => {
+
+              if (event.finalResourceIDArray.length === 0) {
+                  callback(null,event);
+              } else {
+
+                  event.resources = "AWS Account Alias: " + event.accountname 
+                                    + "\nAWS Account: " + process.env.ExecutionAccountId 
+                                    + "\nRegion: " + process.env.ExecutionRegion + "\n";
+                  for(var i=0; i < event.finalResourceIDArray.length; i++){
+                        event.resources =  event.resources + "\n\n" 
+                        + "ResourceName: " + event.finalResourceIDArray[i] + "\n"
+                        + "ResourceType: " + event.finalResourceTypeArray[i] + "\n"
+                        + "EventName: " + event.AllResourceEventName[i] + "\n" 
+                        + "Username: " + event.AllResourceUsername[i] + "\n";
+                  }
+                  aws.config.update({region: 'us-west-1'});
+                  var params = {
+                      Message: event.resources,
+                      Subject: event.accountname + "(" + process.env.ExecutionRegion + ") - Resource flagged for tagging non-compliance",
+                      TopicArn: "arn:aws:sns:us-west-1:848721808596:SNSTopicForTagNonComplianceAlerts"
+                  };
+                  var publishTextPromise = new aws.SNS({apiVersion: '2010-03-31'}).publish(params).promise();
+                  publishTextPromise.then(
+                    function(data) {
+                      console.log('Message ${params.Message} send sent to the topic ${params.TopicArn}');
+                      console.log("MessageID is " + data.MessageId);
+                    }).catch(
+                      function(err) {
+                      console.error(err, err.stack);
+                  });
+              }
+          };
+  LFTagExtractCloudTrailRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFTagExtractCloudTrailPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSCloudTrailReadOnlyAccess'
+  LFTagExtractNoncomplaintResourcesRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFTagExtractNoncomplaintResourcesPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSConfigRole'
+        - 'arn:aws:iam::aws:policy/AWSConfigUserAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AWSConfigRulesExecutionRole'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 3349c1e0-afde-4347-9e1a-7a58f9d7e91d
+  LFTagGetAccountAliasRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFTagGetAccountAliasPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'iam:ListAccountAliases'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 0e904d7b-9f94-431c-89a9-aaada16a6e66
+  LFTagSendEmailViaSNSRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFTagSendEmailViaSNSPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSNSFullAccess'
+  LambdaStateMachineExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub 'states.${AWS::Region}.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: StatesExecutionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                Resource: '*'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 766c7af1-5c82-488f-8807-b664f729125a
+  SFSMNotifyTagsNonCompliance:
+    Type: 'AWS::StepFunctions::StateMachine'
+    Properties:
+      StateMachineName: TagsNonCompliance-SFSMNotify
+      RoleArn: !GetAtt 
+        - LambdaStateMachineExecutionRole
+        - Arn
+      DefinitionString: !Sub |-
+        {
+          "StartAt": "TaskExtractNoncomplaintResources",
+          "States": {
+            "TaskExtractNoncomplaintResources": {
+              "Type": "Task",
+              "Resource": "${LFTagExtractNoncomplaintResources.Arn}",
+              "ResultPath": "$",
+              "Next": "TaskCheckResourceArrayForMoreElements"
+            },
+            "TaskCheckResourceArrayForMoreElements": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.no_resources_to_tag",
+                  "BooleanEquals": true,
+                  "Next": "Success"
+                },
+                {
+                  "Variable": "$.has_elements",
+                  "BooleanEquals": true,
+                  "Next": "TaskExtractCloudTrailResourceData"
+                },
+                {
+                  "Variable": "$.finalArrayisEmpty",
+                  "BooleanEquals": true,
+                  "Next": "Success"
+                }                
+              ],
+              "Default": "TaskGetAccountAlias"
+            },
+            "TaskExtractCloudTrailResourceData": {
+              "Type": "Task",
+              "Resource": "${LFTagExtractCloudTrail.Arn}",
+              "Next": "wait_two_seconds"
+            },
+            "wait_two_seconds": {
+              "Type": "Wait",
+              "Seconds": 2,
+              "Next": "TaskCheckResourceArrayForMoreElements"
+            },
+            "TaskGetAccountAlias": {
+              "Type": "Task",
+              "Resource": "${LFTagGetAccountAlias.Arn}",
+              "Next": "TaskSendEmailViaSNS"
+            },
+            "TaskSendEmailViaSNS": {
+              "Type": "Task",
+              "Resource": "${LFTagSendEmailViaSNS.Arn}",
+              "Next": "Success"
+            },
+            "Success": {
+              "Type": "Succeed"
+            }
+          }
+        }

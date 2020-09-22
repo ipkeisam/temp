@@ -1,0 +1,36 @@
+---
+#####
+#
+# Playbook to create private route53 hosted zones on ocp-int-* clusters 
+# 
+# Instruction:  
+#    To run:
+#      1. Run playbook: ansible-playbook -e "route53_zone_name=<zone name> vpc_id=<vpc id> vpc_region=<vpc_region> resource_id=<resource id>" day2_ocp_int_route53_hosted_zones.yml --ask-vault-pass
+#
+#  LastUpdated: 2019-08-11
+#  UpdatedBy: Randy Liang (randy.liang@capgroup.com)
+#
+- hosts: localhost
+  connection: local
+
+  tasks:
+    - name: Include vars
+      include_vars:
+        dir: vars
+
+    - name: Ensure required packages are installed
+      become: yes
+      shell: yum -y install python3-pip && pip3 install botocore boto3
+     
+    - name: Create a private zone
+      route53_zone:
+        aws_access_key: "{{ aws_access_key_id }}"
+        aws_secret_key: "{{ aws_secret_access_key }}"
+        zone: "{{ route53_zone_name }}"
+        vpc_id: "{{ vpc_id }}"
+        vpc_region: "{{ vpc_region }}"
+        comment: Automated via Ansible on {{ansible_date_time.date}}
+      register: route53_zone 
+
+    - debug:
+        var: route53_zone

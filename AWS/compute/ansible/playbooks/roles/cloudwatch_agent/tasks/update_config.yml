@@ -1,0 +1,36 @@
+---
+- fail:
+    msg: "{{ item }} needs to be defined"
+  when: item is not defined
+  with_items:
+  - aws_region
+
+- name: Check if cloud watch logs service is install
+  stat: 
+    path: /etc/init.d/awslogs
+  register: awslogs_service
+
+- name: Update cloud watch logs config
+  copy:
+    dest: /var/awslogs/etc/awslogs.conf
+    group: root
+    mode: 0600
+    owner: root
+    src: "{{ role_path }}/templates/awslogs.conf.j2"
+  when: awslogs_service.stat.exists
+
+- name: Update AWS region
+  lineinfile:
+    dest: /var/awslogs/etc/aws.conf
+    regexp: '^region ='
+    line: 'region = {{aws_region}}'
+  when: awslogs_service.stat.exists
+  
+- service:
+    name: awslogs
+    state: restarted
+  when: awslogs_service.stat.exists
+
+- debug:
+    msg: "CloudWatch logs agent is not installed.  Exiting..."
+  when: not awslogs_service.stat.exists

@@ -1,0 +1,133 @@
+---
+
+- name: query vpc
+  ec2_vpc_net_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      "tag:Name": "{{ openshift_aws_clusterid }}"
+  register: vpcout
+
+- debug:
+    msg: "{{ vpcout }}"
+
+#
+# create the private policy
+#
+- name: fetch information on OCP subnets for external facing clusters
+  ec2_vpc_subnet_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      vpc-id: "{{ vpcout.vpcs[0].id }}"
+      "tag:Name": '*ocpadmin*'
+  register: externalsubnetout
+  when: openshift_aws_external_facing 
+
+- name: fetch information on OCP subnets for internal facing clusters
+  ec2_vpc_subnet_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      vpc-id: "{{ vpcout.vpcs[0].id }}"
+      "tag:Name": '*OCPCluster*'
+  register: internalsubnetout
+  when: not openshift_aws_external_facing 
+
+- name: Set admin subnet for external cluster
+  set_fact:
+    adminsubnetout: "{{ externalsubnetout }}"
+  when: openshift_aws_external_facing
+
+- name: Set admin subnet for internal cluster
+  set_fact:
+    adminsubnetout: "{{ internalsubnetout }}"
+  when: not openshift_aws_external_facing
+
+- debug:
+    msg: "{{ item.cidr_block }}"
+  with_items: "{{ adminsubnetout.subnets }}"
+
+# populate and create configuration file from template
+- name: create file from template
+  template:
+    dest: "{{ role_path }}/files/private.{{ openshift_aws_env }}"
+    src: "{{ role_path }}/templates/private.j2"
+    mode: "u=rw,g=r,o=r"
+
+- name: populate subnet values to the file
+  lineinfile:
+    path: "{{ role_path }}/files/private.{{ openshift_aws_env }}"
+    line: "{{ item.cidr_block }}"
+    insertafter: EOF
+    mode: 0644
+  with_items: "{{ adminsubnetout.subnets }}"
+
+#
+# create the clear policy
+#
+- name: fetch information on OCP subnets
+  ec2_vpc_subnet_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      vpc-id: "{{ vpcout.vpcs[0].id }}"
+      "tag:Name": '*Internal_ALB*'
+  register: internalsubnetout
+
+- debug:
+    msg: "{{ item.cidr_block }}"
+  with_items: "{{ internalsubnetout.subnets }}"
+
+- name: fetch information on OCP subnets
+  ec2_vpc_subnet_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      vpc-id: "{{ vpcout.vpcs[0].id }}"
+      "tag:Name": '*External_ALB*'
+  register: externalsubnetout
+
+- debug:
+    msg: "{{ item.cidr_block }}"
+  with_items: "{{ externalsubnetout.subnets }}"
+
+- name: query for bastion/control host
+  ec2_instance_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      "tag:app-type": "{{ aws_controlhost_type }}"
+      instance-state-name: running
+  register: instancesout
+  retries: 20
+  delay: 3
+  until: instancesout|length > 0
+
+- debug:
+    msg: "{{ instancesout.instances[0].private_ip_address }}"
+
+# populate and create configuration file from template
+- name: create file from template
+  template:
+    dest: "{{ role_path }}/files/clear.{{ openshift_aws_env }}"
+    src: "{{ role_path }}/templates/clear.j2"
+    mode: "u=rw,g=r,o=r"
+
+- name: populate subnet values to the file
+  lineinfile:
+    path: "{{ role_path }}/files/clear.{{ openshift_aws_env }}"
+    line: "{{ item.cidr_block }}"
+    insertafter: '# Master ELB Subnets'
+    mode: 0644
+  with_items: "{{ internalsubnetout.subnets }}"
+
+- name: populate subnet values to the file
+  lineinfile:
+    path: "{{ role_path }}/files/clear.{{ openshift_aws_env }}"
+    line: "{{ item.cidr_block }}"
+    insertafter: '# VIP ELB Subnets'
+    mode: 0644
+  with_items: "{{ externalsubnetout.subnets }}"
+
+- name: populate subnet values to the file
+  lineinfile:
+    path: "{{ role_path }}/files/clear.{{ openshift_aws_env }}"
+    line: "{{ instancesout.instances[0].private_ip_address }}/32"
+    insertafter: '# Bastion'
+    mode: 0644
+

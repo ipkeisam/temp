@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Wrapper Template for CFMasterServiceCatalogCreateKMS
+Parameters:
+  sourcebucket:
+    Description: "Source bucket where lambda function zip file is stored."
+    Default : "organization-repo"
+    Type: String
+  SecretsManagerRegion:
+    Default: us-east-1
+    Type: String
+  KMSServiceAccountCreds:
+    Default: KMSServiceAccountCreds
+    Type: String
+  KMSOktaURL:
+    Default: https://capgroup.okta.com/oauth2/aus1gdjnsxvx1kTEb1d8/v1/token?grant_type=client_credentials
+    Type: String
+  KMSAPIURL:
+    Default: https://keys.capgroup.com:8443/hsm
+    Type: String
+  ProductEmailAlert:
+    Type: String
+    Description: Email address where SNS notifications will be sent.
+    Default: 'shnc@capgroup.com'
+  CGPrincipalID:
+    Type: String
+    Description: Principal ID of the master account.
+    Default: 'o-1eax4cor5e'
+  SQSRegionName:
+    Default: us-east-1
+    Type: String
+  AlertSchedule:
+    Default: cron(0/30 * * * ? *)
+    Type: String
+  SNSRegion:
+    Default: us-east-1  
+    Type: String
+  SNSTopicARN:
+    Default: arn:aws:sns:us-east-1:848721808596:SNSTopicForSCProductAlerts  
+    Type: String 
+Resources:
+  CFMasterServiceCatalogCreateKMS:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourcebucket
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+        KMSServiceAccountCreds: !Ref KMSServiceAccountCreds
+        KMSOktaURL: !Ref KMSOktaURL
+        KMSAPIURL: !Ref KMSAPIURL
+        ProductEmailAlert: !Ref ProductEmailAlert
+        CGPrincipalID: !Ref CGPrincipalID
+        SQSRegionName: !Ref SQSRegionName
+        AlertSchedule: !Ref AlertSchedule
+        SNSRegion: !Ref SNSRegion
+        SNSTopicARN: !Ref SNSTopicARN
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: ftdev
+        - Key: sd-period
+          Value: na   
+        - Key: category
+          Value: governance                                               
+      TemplateURL: https://organization-repo.s3.amazonaws.com/servicecatalog/appl-portfolio/CFMasterServiceCatalogCreateKMS.yml

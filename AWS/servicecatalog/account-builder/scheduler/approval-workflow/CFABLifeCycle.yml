@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Account Builder Template.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Required information for new account
+        Parameters:
+          - ApplicationName
+          - EnvironmentType
+          - DataSensitivity
+          - POCInitials
+          - CostCenter
+          - PPMCId
+          - ATMId
+          - TechnologyOversightCommittee
+          - AccountExpiryDate
+          - ApplicationRemediationGroup
+         
+Parameters:
+
+  ApplicationName:
+    Description: "Acronym or name of the new AWS Account, only letters no spaces, e.g VOLTA or CDD"
+    Default : "PLATFORMDESIGN"
+    Type: String
+
+  ApplicationRemediationGroup:
+    Description: "Remediation group of application within ServiceNow to direct incidents"
+    Default : "PDS Cloud Foundation Support -L2"
+    Type: String
+
+  EnvironmentType:
+    Description: "Type of environment for which the account is being created"
+    Default : "DEV"
+    Type: String
+    AllowedValues:
+      - DEV
+      - QA
+      - PRD
+
+  DataSensitivity:
+    Description: "Sensitive vs non-sensitive"
+    Default : "non-sensitive"
+    Type: String
+    AllowedValues:
+      - non-sensitive
+      - sensitive
+
+  POCInitials:
+    Description: "Initials of a Point of contact for this account"
+    Default : "PDS"
+    Type: String
+
+  CostCenter:
+    Description: "Cost Center, please enter valid 6 digit number"
+    Default : "123456"
+    Type: String
+    AllowedPattern: "^[0-9]{6}$"
+    ConstraintDescription: "Cost Center is a six digit number"
+
+  PPMCId:
+    Description: "PPMC ID, please enter a valid 5 digit number"
+    Default : "12345"
+    Type: String
+    AllowedPattern: "^[0-9]{5}$"
+    ConstraintDescription: "PPMC ID is a five digit number"
+
+  ATMId:
+    Description: "Application ATM ID, e.g format AA12345678"
+    Default : "AA12345678"
+    Type: String
+    AllowedPattern: "^[A-Za-z]{2}[0-9]{8}$"
+    ConstraintDescription: "ATM ID should be in the format AA12345678 with only upper case letters and numbers"
+
+  TechnologyOversightCommittee:
+    Description: "Technology Oversight Committee"
+    Type: String
+    Default : "ETOC"
+    AllowedValues:
+      - AFSG-MC
+      - ETOC
+      - GBS-ABG
+      - IG-TOC
+      - IO-OC
+      - ISSC
+      - NAD-MC
+      - PCS-AC
+
+  AccountExpiryDate:
+    Description: "Expiry date should be in the format MM-DD-YYYY e.g 12-25-2022"
+    Default : "99-00-9999"
+    Type: String
+    AllowedPattern: "^[0-9]{2}[-][0-9]{2}[-][0-9]{4}$"
+    ConstraintDescription: "Expiry date should be in the format MM-DD-YYYY e.g 12-25-2022"
+
+Resources:
+
+  WaitHandle:
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+    
+  WaitCondition:
+    Type: 'AWS::CloudFormation::WaitCondition'
+    Properties:
+      Handle:
+        Ref: 'WaitHandle'
+      Timeout: '43200'
+
+  NotificationFunction:
+    Type: Custom::NotificationFunction
+    Properties:
+      ServiceToken: 'arn:aws:lambda:us-east-1:848721808596:function:Governance-SNSNotificationLambda'
+      Region: !Ref "AWS::Region"
+      WaitUrl: !Ref WaitHandle
+      EmailID: !Sub
+        - "${RI}@capgroup.com"
+        - RI: !Ref POCInitials
+      organizationUnitName: "CGUSER"
+      accountName: !Ref ApplicationName
+      accountType: "managed"
+      remediationGroup: !Ref ApplicationRemediationGroup
+      environmentType: !Ref EnvironmentType
+      qaDataType: !Ref DataSensitivity
+      networkRegions: "us-east-1,us-west-2"
+      costCenter: !Ref CostCenter
+      ppmcID: !Ref PPMCId
+      usageID: !Ref ATMId
+      toc: !Ref TechnologyOversightCommittee
+      shutDownPeriod: "na"
+      expiryDate: !Ref AccountExpiryDate
+      poc: !Ref POCInitials
+
+  TriggerLambda:
+    Type: "Custom::TriggerLambda"
+    DeletionPolicy: Retain
+    DependsOn: 'WaitCondition'
+    Properties:
+      ServiceToken: arn:aws:sns:us-east-1:848721808596:SNAccountBuilderLifeCycleTopic
+      organizationUnitName: "CGUSER"
+      accountName: !Ref ApplicationName
+      accountType: "managed"
+      remediationGroup: !Ref ApplicationRemediationGroup
+      environmentType: !Ref EnvironmentType
+      qaDataType: !Ref DataSensitivity
+      networkRegions: "us-east-1,us-west-2"
+      costCenter: !Ref CostCenter
+      ppmcID: !Ref PPMCId
+      usageID: !Ref ATMId
+      toc: !Ref TechnologyOversightCommittee
+      shutDownPeriod: "na"
+      expiryDate: !Ref AccountExpiryDate
+      poc: !Ref POCInitials
+      snow: "SERVICENOW"
+      WaitUrl: !Ref WaitHandle

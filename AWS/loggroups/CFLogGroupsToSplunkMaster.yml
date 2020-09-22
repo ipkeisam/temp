@@ -1,0 +1,177 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Loggroup Subscription Filter setup for any account
+Parameters:
+  KinesisAccountID:
+     Default: na
+     Description: AWS Account Number that manages kinesis streams
+     Type: String
+  sourceBucket:
+     Default: na
+     Description: source bucket for loggroup mapping json file
+     Type: String
+  LoggroupMappingFile:
+     Default: na
+     Description: location of json file
+     Type: String
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      sourcebucket: organization-repo
+      #s3objectversion: 4WsM9VAANJmTwKYXVgwh_bPwxx0ghFb0
+    us-east-2: 
+      sourcebucket: organization-repo-e2
+      #s3objectversion: O_g4mRmUKSWS5096bGelNrS23diOMDY8
+    us-west-1: 
+      sourcebucket: organization-repo-w1
+      #s3objectversion: U8u.xz_o7nAEuo.ucqyP.XxBVMWgEjja
+    us-west-2: 
+      sourcebucket: organization-repo-w2
+      #s3objectversion: cnckwjRQP26VYP3UnNGL3VqtCqqzyzZo
+Resources:
+  CWLogEventBus:
+    Type: AWS::Events::EventBus
+    Properties: 
+      Name: loggroupfilter
+  CWLogEventBusPolicy: 
+    Type: AWS::Events::EventBusPolicy
+    Properties: 
+      EventBusName: !Ref CWLogEventBus
+      Action: "events:PutEvents"
+      Principal: "*"
+      StatementId: "GrantPermissionToEntireOrg"
+      Condition: 
+          Type: "StringEquals"
+          Key: "aws:PrincipalOrgID"
+          Value: "o-1eax4cor5e"
+  CWLogEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: >-
+        Trigger a Lambda function anytime a new CWLog resource is created (Cloud Watch Log Group)
+      EventPattern:
+        source: 
+          - aws.logs
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - logs.amazonaws.com
+          eventName:
+            - CreateLogGroup
+      EventBusName: !Ref CWLogEventBus
+      Name: Master-CWLogGroup-Filter-Creation
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LFCreateSubscriptionFilter"
+              - "Arn"
+          Id: "LFCreateSubscriptionFilterProd"
+
+  LFCreateSubscriptionFilter:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          KINESIS_ACCOUNT: !Ref KinesisAccountID
+          LOGGROUP_MAPPING_FILE: !Ref LoggroupMappingFile
+          SOURCE_BUCKET: !Ref sourceBucket
+      Description: This function applies subscription filter to specific log groups. 
+      Handler: LFCreateSubscriptionFilter.lambda_handler 
+      Role: !GetAtt 
+        - LFCreateSubscriptionFilterRole
+        - Arn
+      Runtime: python3.8 
+      Timeout: '60'
+      Code:
+      Code:
+        S3Bucket: 
+          !Sub
+            - '${SourceBucket}'
+            - { SourceBucket: !FindInMap [RegionMap, !Ref 'AWS::Region', sourcebucket]}
+        S3Key: "loggroup/LFCreateSubscriptionFilter.zip"
+        # S3ObjectVersion:
+        #   !Sub
+        #     - '${S3ObjectVersion}'
+        #     - { S3ObjectVersion: !FindInMap [RegionMap, !Ref 'AWS::Region', s3objectversion]}
+  LFCreateSubscriptionFilterLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFCreateSubscriptionFilter
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFCreateSubscriptionFilter
+      RetentionInDays: 14
+  PermissionForCWLogEventsToInvokeLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: 
+        Ref: LFCreateSubscriptionFilter
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - CWLogEventRule
+          - Arn
+  LFCreateSubscriptionFilterRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFCreateSubscriptionFilterPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - 'logs:PutSubscriptionFilter'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetBucketEncryption'
+                  - 's3:GetBucketVersioning'
+                  - 's3:ListObjectsV2'
+                  - 's3:ListObjects'
+                  - 's3:ListAllMyBuckets'
+                  - 's3:HeadBucket'
+                  - 's3:ListBucket'
+                Resource:
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListParts'
+                  - 's3:ListMultipartUploadParts'
+                Resource:
+                  - 'arn:aws:s3:::*/*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'kms:Decrypt'
+                  - 'kms:GenerateDataKey'
+                  - 'kms:DescribeKey'
+                Resource:
+                  - '*'
+              - Sid: AssumeOrgRole
+                Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: 'arn:aws:iam::*:role/OrganizationAccountAccessRole'

@@ -1,0 +1,90 @@
+---
+esi_aws_atm_id: AA00002740
+esi_aws_ppmc_id: "80191"
+esi_aws_cost_center: "524077" 
+
+esi_aws_database_ec2_common_acct: [ 'computeadmin1', 'computeadmin2', 'cyark_rc', 'x_vmast', 'oracle' ]
+
+# default instance type to use
+esi_aws_ec2_database_instance_type: m5.2xlarge
+
+# default AMI parameter 
+esi_aws_ami_copy_wait: True
+esi_aws_ami_encrypt: True
+esi_aws_ami_name: rhel7-rootenc
+esi_aws_ami_desc: RHEL-7.x_HVM_GA
+# set by copy_ami.yml
+esi_aws_ami_copy_custom_ami: ''
+
+esi_aws_wait_for_ssh: True
+
+esi_aws_vpc_name: "{{ esi_aws_clusterid }}"
+
+# termination protection
+esi_aws_ec2_termination_protection: no
+
+esi_aws_ec2_database_user_data: |
+          #!/bin/bash
+          #
+          # update sshd_config to allow password auth
+          sed -i 's/^ssh_pwauth:.*/ssh_pwauth:   1/' /etc/cloud/cloud.cfg
+          sed -i 's/^PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          # only allow strong ciphers for ssh
+          sed -i '/#   Protocol 2/a Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour\nMACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160' /etc/ssh/ssh_config
+          sed -i '/#RekeyLimit default none/a Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour\nMACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160' /etc/ssh/sshd_config
+          # restart sshd daemon 
+          service sshd restart
+          # update locatime to PST
+          rm -f /etc/localtime
+          ln -s /usr/share/zoneinfo/US/Pacific /etc/localtime 
+          # Make sure EBS volumes have been created AND attached to this instance !
+          # Wait for volume to be available 
+          while [ ! -e /dev/nvme1n1 ] ; do echo waiting for /dev/nvme1n1 to attach; sleep 10 ; done
+          # Format /dev/nvme1n1 if it does not contain a partition yet
+          if file -b -s /dev/nvme1n1 == "data" ; then
+            mkfs.ext4 -E nodiscard /dev/nvme1n1
+          fi
+          # Persist the volume in /etc/fstab so it gets mounted again
+          echo '/dev/nvme1n1       /users/oracle                 ext4    defaults,nofail 0       2' >> /etc/fstab
+          # Wait for volume to be available 
+          while [ ! -e /dev/nvme2n1 ] ; do echo waiting for /dev/nvme1n1 to attach; sleep 10 ; done
+          # Format /dev/nvme1n1 if it does not contain a partition yet
+          if file -b -s /dev/nvme2n1 == "data" ; then
+            mkfs.ext4 -E nodiscard /dev/nvme2n1
+          fi
+          # Persist the volume in /etc/fstab so it gets mounted again
+          echo '/dev/nvme2n1       /users/oradata                 ext4    defaults,nofail 0       2' >> /etc/fstab          
+          # create /var/lib/etcd mount point and mount volume
+          mkdir -p /users/oradata; mkdir -p /users/oracle
+          mount -a
+
+esi_aws_database_instance_data_volume:
+  oracle:
+    device_name: /dev/sdb
+    volume_size: 250
+    volume_type: io1
+    volume_iops: 9000
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ esi_aws_volume_kms_key_id }}"
+  oradata:
+    device_name: /dev/sdc
+    volume_size: 250
+    volume_type: io1
+    volume_iops: 9000
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ esi_aws_volume_kms_key_id }}"
+
+# default esi resource tagging
+esi_aws_resource_tags:
+  Name: "{{ esi_aws_resource_type }}"
+  usage-id: "{{ esi_aws_atm_id }}"
+  cost-center: "{{ esi_aws_cost_center }}"
+  sec-profile: normal
+  exp-date: 99-00-9999
+  sd-period: na
+  p-id: "{{ esi_aws_ppmc_id }}"
+  env-type: ocp
+  cloud-dependency: cloudonly
+  app-type: "{{ esi_aws_resource_type }}"

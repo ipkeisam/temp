@@ -1,0 +1,12 @@
+---
+# defaults file for cg-all-splunk_uf Windows
+cg:
+        uf_enabled: true                                      
+        deployment_server: 'x592757.cguser.capgroup.com'
+        deployment_server_port: '8089'
+        user: 'admin'
+        password: 'changeme'
+        install_directory: '{{ ansible_env.ProgramFiles }}\SplunkUniversalForwarder'
+        vers: '7.0.3'
+        binary: 'splunkforwarder-7.0.3-fa31da744b51-x64-release.msi'
+        working_directory: 'c:\Temp\Splunk'

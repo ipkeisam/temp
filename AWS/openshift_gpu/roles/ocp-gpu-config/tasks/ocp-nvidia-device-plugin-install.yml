@@ -1,0 +1,19 @@
+---
+# Commands will be ran on a master server 
+
+- name: "Log into ocp as system:admin"
+  shell: oc login -u system:admin 
+
+- name: "Label all gpu nodes"
+  shell: oc label node "{{ item }}" openshift.com/gpu-accelerator=true --overwrite=true
+  with_items:
+    - "{{ groups['gpu_nodes'] }}"
+
+- name: "Copy nvidia-device-plugin.yml over to master[0]"
+  copy:
+    src: roles/ocp-gpu-config/files/nvidia-device-plugin.yml
+    dest: /home/ec2-user/nvidia-device-plugin.yml
+
+- name: "Create nvidia device plugin from yaml file"
+  shell: oc create -f /home/ec2-user/nvidia-device-plugin.yml
+  ignore_errors: True

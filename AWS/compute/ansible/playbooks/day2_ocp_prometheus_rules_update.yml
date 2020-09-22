@@ -1,0 +1,28 @@
+---
+##### 
+# Update Prometheus Rules
+#
+# Instruction:
+#  Use this playbook to update Prometheus rules for Openshift 4.x clusters.
+#  You must do 'oc login' to your cluster before running this playbook
+#  
+#  To run:
+#    1. ansible-playbook -i <inventory file> -e "cluster_name=<cluster name>" -e "operator_name=<operator name>" day2_ocp_prometheus_rules_update.yml 
+#  
+#  Example: ansible-playbook -i /home/cpzinfbb00000085s002/ocp-provisioning/ocp-dev.cfg -e "cluster_name=ext-dev-west" -e "operator_name=openshift-cluster-version" day2_ocp_prometheus_rules_update.yml
+# 
+#  LastUpdated: 2020-09-21
+#  UpdatedBy: Ip Sam ( coniws@capgroup.com )
+#
+- name: "Update Prometheus Rules"
+  connection: local
+  gather_facts: false
+  hosts: localhost
+  vars: 
+    ansible_python_interpreter: /usr/bin/python3
+  tasks: 
+    - name: "Update Prometheus Rules"
+      k8s:
+        src: prometheus_rules/{{ operator_name }}/{{ cluster_name }}.yaml
+        apply: yes
+        state: present

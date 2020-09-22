@@ -1,0 +1,22 @@
+---
+
+- name: create key pair
+  ec2_key:
+      name: "{{ openshift_aws_ssh_key_name }}"
+      force: false
+      region: "{{ openshift_aws_region }}"
+      state: present
+  register: ec2_key_result
+
+- debug:
+    msg: "{{ ec2_key_result }}"
+
+- name: save key pair
+  copy: content="{{ ec2_key_result.key.private_key }}" dest="{{ role_path }}/files/{{ openshift_aws_ssh_key_name }}.pem" mode=0600
+
+- name: return key pair name
+  set_fact:
+    openshift_aws_ssh_key_name: "{{ ec2_key_result.key.name }}"
+
+- debug:
+    msg: "{{ role_path }}/files/{{ openshift_aws_ssh_key_name }}.pem key pair has been successfully created"

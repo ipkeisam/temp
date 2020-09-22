@@ -1,0 +1,49 @@
+---
+- name: check if /etc/ipsec.d/policies/clear already exist    
+  stat: 
+    path: /etc/ipsec.d/policies/clear
+  register: clear_file_stats
+
+- name: prompt for user whether to continue or not
+  pause: prompt='File already exists, please confirm you want to overwrite! Press return to continue. Press Ctrl+c and then "a" to abort'
+  when: clear_file_stats.stat.exists == true
+
+# copy clear policy file to all nodes
+- name: create ocp configuration file name /etc/ipsec.d/policies/clear
+  copy:
+    dest: /etc/ipsec.d/policies/clear
+    src: "{{ role_path }}/files/clear.{{ openshift_aws_env }}"
+    mode: "u=rw,g=r,o=r"
+    force: yes
+
+- name: get eth0 gateway 
+  shell: ip route | awk '/default/ { print $3 }' 
+  register:  eth0_gw
+  #when: openshift_aws_dual_nic
+
+- name: populate values in the clear policy
+  lineinfile:
+    path: /etc/ipsec.d/policies/clear
+    line: "{{ eth0_gw.stdout }}/32"
+    insertafter: '# Internet Gateway'
+  #when: openshift_aws_dual_nic
+
+- name: check if /etc/ipsec.d/policies/private already exist    
+  stat: 
+    path: /etc/ipsec.d/policies/private
+  register: private_file_stats
+
+- name: prompt for user whether to continue or not
+  pause: prompt='File already exists, please confirm you want to overwrite! Press return to continue. Press Ctrl+c and then "a" to abort'
+  when: private_file_stats.stat.exists == true
+
+# copy private policy file to all nodes
+- name: create ocp configuration file name /etc/ipsec.d/policies/private
+  copy:
+    dest: /etc/ipsec.d/policies/private
+    src: "{{ role_path }}/files/private.{{ openshift_aws_env }}"
+    mode: "u=rw,g=r,o=r"
+    force: yes
+
+
+

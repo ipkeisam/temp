@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: KMS Onboarding for a new account
+Parameters:
+  sourceBucket:
+    Default: organization-repo  
+    Type: String
+  SecretsManagerRegion:
+    Default: us-east-1
+    Type: String
+  KMSServiceAccountCreds:
+    Default: KMSServiceAccountCreds
+    Type: String
+  KMSOktaURL:
+    Default: https://capgroup.okta.com/oauth2/aus1gdjnsxvx1kTEb1d8/v1/token?grant_type=client_credentials
+    Type: String
+  KMSAPIURL:
+    Default: https://keys.capgroup.com:8443/hsm
+    Type: String    
+Resources:
+  LFNewAccountKMSKeys:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          SecretsManagerRegionName: !Ref SecretsManagerRegion
+          KMSServiceAccountCreds: !Ref KMSServiceAccountCreds
+          KMSOktaURL: !Ref KMSOktaURL
+          KMS_URL: !Ref KMSAPIURL
+      Description: This function is the KMS onboarding module 
+      Handler: LFNewAccountKMSKeys.lambda_handler
+      Role: !GetAtt 
+        - LFNewAccountKMSKeysRole
+        - Arn
+      Runtime: python3.8 
+      Layers: 
+        - arn:aws:lambda:us-east-1:848721808596:layer:http-requests:2
+      Timeout: 900
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "acctautomation/LFNewAccountKMSKeys.zip"
+        S3ObjectVersion: "2q3vjo1ybdKfNAvhd1Dh4g.C3aFlmMFL"
+      VpcConfig:
+        SecurityGroupIds: 
+          - sg-029facd71b9750091
+        SubnetIds: 
+          - subnet-0d16801c03a7f80d9
+          - subnet-0e9fb2a1b52350f64 
+  LFNewAccountKMSKeysRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: AccountVending-LFNewAccountKMSKeysRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFNewAccountKMSKeysPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+              - Sid: AssumeOrgRole
+                Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: 'arn:aws:iam::*:role/OrganizationAccountAccessRole'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                  - 'ec2:CreateKMSInterface'
+                  - 'ec2:DescribeKMSInterfaces'
+                  - 'ec2:DeleteKMSInterface'
+                  - 'ec2:ModifyEbsDefaultKmsKeyId'
+                  - 'ec2:ResetEbsDefaultKmsKeyId'
+                  - 'ec2:EnableEbsEncryptionByDefault'
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'kms:Decrypt'
+                  - 'kms:GenerateDataKey'
+                  - 'kms:TagResource'
+                  - 'kms:CreateKey'
+                  - 'kms:PutKeyPolicy'
+                  - 'kms:GetParametersForImport'
+                  - 'kms:CreateAlias'
+                  - 'kms:ImportKeyMaterial'
+                  - 'kms:DescribeKey'
+                Resource:
+                  - '*'
+  LFNewAccountKMSKeysLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFNewAccountKMSKeys
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFNewAccountKMSKeys
+      RetentionInDays: 14
+
+Outputs:
+  LFNewAccountKMSKeysArn:
+    Value: !GetAtt LFNewAccountKMSKeys.Arn

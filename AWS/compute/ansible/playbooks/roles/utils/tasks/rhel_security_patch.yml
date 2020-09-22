@@ -1,0 +1,63 @@
+---
+#- name: Query for available security yum packages
+#  command: yum list-security --security
+#  ignore_errors: true
+
+- name: set default security_only flag if not defined
+  set_fact:
+    security_only: true
+  when: security_only is undefined
+
+- debug:
+    var=security_only
+
+- name: install atomic-openshift-excluder and atomic-openshift-docker-excluder utils
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+    - atomic-openshift-excluder
+    - atomic-openshift-docker-excluder 
+
+#In order to protect sensitive packages that do not need to be updated, apply the exclude rules to the host
+- name: apply docker exclude rule
+  command: atomic-openshift-docker-excluder exclude
+
+- name: apply ocp exclude rule 
+  command: atomic-openshift-excluder exclude
+
+- name: update all packages to latest available
+  yum:
+    state: latest
+    name: '*'
+  register: yum_output
+  when: "security_only=='false'"
+
+- name: update only Red Hat Security Advisory (RHSA) errata
+  yum:
+    state: latest
+    name: '*'
+    security: yes
+  register: yum_output
+  when: security_only
+
+- debug:
+    msg: "{{ yum_output }}"
+
+- name: reboot host for updated packages
+#  shell: needs-restarting -r || shutdown -r now "Ansible updates triggered"
+  shell: sleep 5 && /sbin/shutdown -r now "Ansible updates triggered"
+  async: 1
+  poll: 0
+
+#- name: Restart services that does not require host reboot
+#  command: systemctl restart {{ service_name }} 
+#  when: service_restart | default(False) | bool
+
+#- debug:
+#    msg: "The following services has been restarted: {{ service_name }}"  
+#  when: service_restart | default(False) | bool
+
+#- debug:
+#    msg: "If {{ service_name }} service(s) has been restarted.  Please ensure it restarts successfully on the affected hosts."
+#  when: service_restart | default(False) | bool

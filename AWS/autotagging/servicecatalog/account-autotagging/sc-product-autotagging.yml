@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Auto Tagging ServiceCatalog product.
+Parameters:
+  PortfolioProvider:
+    Type: String
+    Description: Owner and Distributor Name
+  LaunchConstraintARN:
+    Type: String
+    Description: ARN of the launch constraint role for auto-tag products.
+  PortfolioId:
+    Type: String
+    Description: The ServiceCatalog portfolio this product will be attached to.
+  RepoRootURL:
+    Type: String
+    Description: Root url for the repo containing the product templates.
+  ServiceCatalogGovernanceTopic:
+    Type: String
+    Description: ARN of SNS Topic that receives notifications when auto-tagging product is created.
+Resources:
+  scautotagproduct:
+    Type: 'AWS::ServiceCatalog::CloudFormationProduct'
+    Properties:
+      Name: Auto Tag Account
+      Description: >-
+        This product sets up auto tagging of resources within an account
+      Owner: !Ref PortfolioProvider
+      Distributor: !Ref PortfolioProvider
+      SupportDescription: Cloud Support Team
+      SupportEmail: PDS_-_Platform_Design_services@capgroup.com
+      AcceptLanguage: en
+      SupportUrl: 'http://capitalgroup.service-now.com'
+      ProvisioningArtifactParameters:
+        - Description: baseline version
+          Info:
+            LoadTemplateFromURL: !Sub '${RepoRootURL}CFAutoTaggingSelfService.yml'
+          Name: v1.0
+  Associateautotag:
+    Type: 'AWS::ServiceCatalog::PortfolioProductAssociation'
+    Properties:
+      PortfolioId: !Ref PortfolioId
+      ProductId: !Ref scautotagproduct
+  constraintautotag:
+    Type: 'AWS::ServiceCatalog::LaunchRoleConstraint'
+    DependsOn: Associateautotag
+    Properties:
+      PortfolioId: !Ref PortfolioId
+      ProductId: !Ref scautotagproduct
+      RoleArn: !Ref LaunchConstraintARN
+      Description: !Ref LaunchConstraintARN
+
+  AutoTaggingCreatedLaunchNotification:
+    Type: "AWS::ServiceCatalog::LaunchNotificationConstraint"
+    Properties:
+      Description: "Publishes notifications when auto tagging is setup for an account."
+      NotificationArns: 
+        - !Ref ServiceCatalogGovernanceTopic
+      PortfolioId: !Ref PortfolioId
+      ProductId: !Ref scautotagproduct
+    DependsOn: Associateautotag
+Outputs:
+  ProductId:
+    Value: !Ref scautotagproduct

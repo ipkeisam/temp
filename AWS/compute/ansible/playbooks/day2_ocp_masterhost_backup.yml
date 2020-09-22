@@ -1,0 +1,91 @@
+---
+#####
+#
+# Playbook to create a master host backup
+# 
+# Instruction:  
+#    To run:
+#      1. Run playbook: ansible-playbook -e "master_hostname=<master hostname>" /home/ec2-user/playbooks/day2_ocp_masterhost_backup.yml 
+#
+# Example:  ansible-playbook -e "master_hostname=ip-10-244-152-213.us-west-1.compute.internal" /home/ec2-user/playbooks/day2_ocp_masterhost_backup.yml 
+# 
+# extra-vars options 
+#  --------------------------------------------------------------------------------------------------------------------
+#  |  variable name           |       value                 |    require or optional    |     comments
+#  --------------------------------------------------------------------------------------------------------------------
+#  | master_hostname          | AWS private dns name        |    require                | ip-10-244-152-213.us-west-1.compute.internal
+#  ---------------------------------------------------------------------------------------------------------------------
+#
+#  LastUpdated: 2019-07-13
+#  UpdatedBy: Ip Sam ( coniws@capgroup.com )
+#
+
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+
+  vars:
+   # define env specific var
+   openshift_aws_env_var_file: "{{ env_var_file }}"
+   o_user: "snpinfbb00000085s002"
+
+  tasks:
+  - fail:
+      msg: "{{ item }} needs to be defined"
+    when: item not in vars
+    with_items:
+    - master_hostname
+
+  - name: export all master host resources
+    become: yes
+    become_method: dzdo
+    script: "roles/openshift/files/ocp-masterhost-backup.sh"
+    delegate_to: "{{ master_hostname }}"
+
+  - name: create file
+    become: yes
+    become_method: dzdo
+    command: touch /tmp/backup/{{ env }}.{{ansible_date_time.date}}.tar.gz
+    delegate_to: "{{ master_hostname }}"
+
+  - name: archive backup to /tmp
+    become: yes
+    become_method: dzdo
+    archive:
+      path: /tmp/backup/{{ master_hostname }}
+      dest: /tmp/backup/{{ env }}.{{ansible_date_time.date}}.tar.gz
+      mode: 0777
+      format: gz
+    delegate_to: "{{ master_hostname }}"
+
+  - name: create backup folder on bastion if it doesn't exist
+    become: yes
+    become_method: dzdo
+    block:
+      - name: check folder
+        stat:
+          path: /home/{{ o_user }}/ocp_masterhost_backup
+        register: folder
+      - name: create folder if doesn't exist
+        file:
+          path: /home/{{ o_user }}/ocp_masterhost_backup
+          state: directory
+          mode: 0755
+        when: not folder.stat.exists
+
+  - name: copy archive file to bastion
+    become: yes
+    become_method: dzdo
+    fetch:
+      src: /tmp/backup/{{ env }}.{{ansible_date_time.date}}.tar.gz
+      dest: /home/{{ o_user }}/ocp_masterhost_backup/
+      flat: yes
+    delegate_to: "{{ master_hostname }}"
+
+  - name: cleanup on "{{ master_hostname }}"
+    become: yes
+    become_method: dzdo
+    file:
+      state: absent
+      path: /tmp/backup
+    delegate_to: "{{ master_hostname }}"

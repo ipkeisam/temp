@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Auto Tagging Lambda Function.
+Parameters:
+  sourcebucket:
+    Description: "Source bucket where lambda function zip file is stored."
+    Default : na
+    Type: String
+Resources:
+  LFAutoTaggingLambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Handler: "LFAutoTaggingLambda.lambda_handler"
+      Runtime: "python3.8"
+      Role: !GetAtt LFAutoTaggingLambdaRole.Arn
+      Timeout: 120
+      Code:
+        S3Bucket: !Ref sourcebucket
+        S3Key: "servicecatalog/LFAutoTaggingLambda.zip"
+
+  LFAutoTaggingLambdaLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFAutoTaggingLambda
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFAutoTaggingLambda
+      RetentionInDays: 14
+
+  LFAutoTaggingLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: LFAccountBaselineSplunkPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AWSCloudFormationFullAccess'

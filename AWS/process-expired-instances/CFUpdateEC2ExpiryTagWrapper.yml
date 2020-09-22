@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: WrapperTemplate for CFUpdateEC2ExpiryTag
+Parameters:
+  NoOfDaysOut:
+    Default: 90  
+    Type: Number
+Resources:
+  CFUpdateEC2ExpiryTag:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        NoOfDaysOut: !Ref NoOfDaysOut
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prod
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/tagremediation/CFUpdateEC2ExpiryTag.yml 

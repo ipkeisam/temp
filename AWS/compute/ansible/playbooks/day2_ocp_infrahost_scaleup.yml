@@ -1,0 +1,93 @@
+---
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+ 
+##########################################################################################################
+#
+# Playbook for provisioning of 3 node Openshift Container Platform in AWS 
+# Set control flags to create/provision the following:
+#   - provision infra hosts
+
+#
+# Instruction:  
+#    To run:
+#      1. Source AWS credentials ( make sure that it corresponds to the account and environment that is being worked on)
+#      2: Run playbook:  ansible-playbook -e "env_var_file=<env specific vars>" ocp_playbook.yml
+#
+# Example:  ansible-playbook -e "env_var_file=int_dev_us_east_1.yml" ocp_playbook.yml
+#
+# extra-vars options 
+#  --------------------------------------------------------------------------------------------------------------------
+#  |  variable name           |       value                 |    require or optionanl   |     comments
+#  --------------------------------------------------------------------------------------------------------------------
+#  | env_var_file             | env specif var file         |    require                | located under roles/openshift/vars/
+#  ---------------------------------------------------------------------------------------------------------------------
+#  | master_docker_vol_size   | numerical value in GB       |   optional (default 50 )  |     
+#  ---------------------------------------------------------------------------------------------------------------------
+#  | infra_docker_vol_size    | numerical value in GB       |   optional (default 100 ) |              
+#  ---------------------------------------------------------------------------------------------------------------------
+#  | app_docker_vol_size      | numerical value in GB       |   optional (default 100 ) |
+#  -----------------------------------------------------------------------------------------------------------------------
+#
+#  LastUpdated: 2018-10-26
+#  UpdatedBy: Philip Phan ( phlp@capgroup.com )
+#
+
+  vars:
+    # define env specific var 
+    openshift_aws_env_var_file: "{{ env_var_file }}"
+    # flags to enable / disable tasks  
+    openshift_aws_provision_all_infra_hosts: False
+    openshift_aws_provision_infra1_hosts: False 
+    openshift_aws_provision_infra2_hosts: False 
+    openshift_aws_provision_infra3_hosts: False 
+
+
+  tasks:
+  - fail:
+      msg: "{{ item }} needs to be defined"
+    when: item not in vars
+    with_items:
+    - env_var_file
+      
+  - name: include env file to work around ansible 2.4 issue
+    include_vars: roles/openshift/vars/{{ env_var_file }}
+
+
+  # Provision infra hosts
+  - name: provision infra hosts 1
+    include_role:
+      name: openshift
+      #vars_from: "{{ openshift_aws_env_var_file }}" 
+      tasks_from: provision_infra_instances.yml
+    vars:
+      openshift_aws_resource_type: "{{ aws_infrahost_type }}"
+      openshift_aws_admin_subnet: '{{ vars["openshift_aws_admin_subnet_1"] }}'
+      openshift_aws_cluster_subnet: '{{ vars["openshift_aws_cluster_subnet_1"] }}'
+    when: openshift_aws_provision_infra1_hosts or openshift_aws_provision_all_infra_hosts | default(False) | bool
+
+  - name: provision infra hosts 2
+    include_role:
+      name: openshift
+      #vars_from: "{{ openshift_aws_env_var_file }}" 
+      tasks_from: provision_infra_instances.yml
+    vars:
+      openshift_aws_resource_type: "{{ aws_infrahost_type }}"
+      openshift_aws_admin_subnet: '{{ vars["openshift_aws_admin_subnet_2"] }}'
+      openshift_aws_cluster_subnet: '{{ vars["openshift_aws_cluster_subnet_2"] }}'
+    when: openshift_aws_provision_infra2_hosts or openshift_aws_provision_all_infra_hosts | default(False) | bool         
+
+  - name: provision infra hosts 3
+    include_role:
+      name: openshift
+      #vars_from: "{{ openshift_aws_env_var_file }}" 
+      tasks_from: provision_infra_instances.yml
+    vars:
+      openshift_aws_resource_type: "{{ aws_infrahost_type }}"
+      openshift_aws_admin_subnet: '{{ vars["openshift_aws_admin_subnet_3"] }}'
+      openshift_aws_cluster_subnet: '{{ vars["openshift_aws_cluster_subnet_3"] }}'
+    when: openshift_aws_provision_infra3_hosts or openshift_aws_provision_all_infra_hosts | default(False) | bool
+
+

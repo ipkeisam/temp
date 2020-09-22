@@ -1,0 +1,46 @@
+---
+# tasks file for cg_os_base - rsyslog
+
+- name: ensure rsyslog is installed
+  yum:
+    name: rsyslog
+    state: present
+
+- name: Create OS group for reading syslog files
+  group:
+    name: syslog
+    state: present
+
+- name: create standard rsyslog.conf
+  template:
+    src: rsyslog.conf.new.j2
+    dest: /etc/rsyslog.conf
+    mode: 0644
+    owner: root
+    group: root
+
+- name: ensure rsyslog is running and enabled
+  service:
+    name: rsyslog
+    state: restarted
+    enabled: yes
+
+- name: Give immediate access to /var/log/messages
+  file:
+    path: /var/log/messages
+    mode: 0640
+    owner: root
+    group: syslog
+    state: file
+
+#- name: Add Oracle audit log to logrorate. No harm done if the file doesn't exist.
+#  lineinfile:
+#    path: /etc/logrotate.d/syslog
+#    line: '/var/log/oracle_audit.log'
+#    insertafter: '^/var/log/spooler$'
+
+- name: Change permissions of syslog files at log rotation
+  lineinfile:
+    path: /etc/logrotate.d/syslog
+    line: '    create 0640 root syslog'
+    insertafter: '^{$'

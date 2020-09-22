@@ -1,0 +1,27 @@
+---
+
+###
+# start of block for ESI us-west-1
+###
+
+esi_aws_ppmc_id: "80191" 
+
+esi_aws_ssh_key_name: cf-nad-dev-esi-us-west-1
+esi_aws_rootenc_ami: ami-e9e6f489
+esi_aws_volume_kms_key_id: bdda7ca7-becd-4318-8f78-b61730eb0d49
+
+esi_aws_clusterid: vpc1_naddev-us-west-1-nad-dev
+esi_aws_region: us-west-1
+
+# define instance types
+esi_aws_ec2_database_instance_type: m5.2xlarge
+
+# subnet information
+esi_aws_admin_subnet_1: 
+  - { subnet: subnet-f76c4d90, az: us-west-1a, count: 1 }
+esi_aws_admin_subnet_2:
+  - { subnet: subnet-4188fa1a, az: us-west-1c, count: 1 }
+
+###
+# end of block for ESI us-west-1
+###  

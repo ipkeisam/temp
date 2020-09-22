@@ -1,0 +1,110 @@
+---
+# gateways/tasks/main.yml
+# create the gateways for the VPC, and sets up routing for the subnets
+
+#create Internet Gateway if public_facing is set to true
+- name: create Internet Gateway    
+  ec2_vpc_igw:
+    #name:     "igw-{{vpc_name}}-{{aws_region}}"
+    state:    "present"
+    vpc_id:   "{{vpcid}}"
+    region:   "{{aws_region}}"
+    tags:
+      Name:     "igw-{{vpc_name}}-{{aws_region}}"
+      usage-id: "{{resource_usage_id}}"
+      exp-date: "{{exp_date}}"
+      sd-period: "{{sd_period}}"
+      cloud-dependency: "{{cloud_dependency}}"
+      atm-id: "{{atm_id}}"
+      p-id: "{{p_id}}"
+      cost-center: "{{cost_center}}"
+      env-type: "{{env_type}}"
+  register: create_igw
+  when:     public_facing
+  
+- name: get igw gateway id
+  set_fact:
+    vpc_igw_gateway_id:   "{{create_igw.gateway_id}}"
+  when:   create_igw.gateway_id is defined
+
+
+#create nat Gateway if public_facing is set to true
+- name: "create NAT Gateway for availability zones associated public subnets."
+  ec2_vpc_nat_gateway:
+    state:     "present"
+    subnet_id: "{{ vpc_public_subnets_id['subnet' + item.value.cnt + '-' + item.value.sname + '-' + item.value.az_name + '-' + env_type] }}"
+    wait: yes
+    region:    "{{aws_region}}"
+    if_exist_do_not_create: true
+  register:  nat_gateways
+  with_dict:  "{{vpc_public_subnets}}"
+  when: "(item.value.natgtw is not none) and (item.value.natgtw is defined) and public_facing"
+
+
+# once NAT gateway is created, 
+#   1. We are gathering the list of NAT gateways from the execution result.
+#   2. Group NAT gateways by Availability Zone in "vpc_nat_gateway_ids_by_az" list.
+# This  
+- name: "set facts: NAT gateway ID"
+  set_fact:
+    vpc_nat_gateway_ids_by_az: "{{vpc_nat_gateway_ids_by_az | default({}) | combine({item.item.value.az_name: item.nat_gateway_id})}}"
+  with_items: "{{ nat_gateways.results }}"
+  when: item.skipped is not defined
+
+#- debug: 
+#    msg: "{{ vpc_nat_gateway_ids_by_az }}"
+
+#create vpn gateway if VPN connect or VPN_backup is true and attched to the vpc
+- name: Create VPN gateway
+  ec2_vpc_vgw:
+    name:   vpngw-{{vpc_name}}-{{aws_region}}
+    state:   "present"
+    region:  "{{aws_region}}"
+    vpc_id:  "{{vpcid}}"
+    type:    "ipsec.1"
+    tags:
+      usage-id: "{{resource_usage_id}}"
+      exp-date: "{{exp_date}}"
+      sd-period: "{{sd_period}}"
+      cloud-dependency: "{{cloud_dependency}}"
+      atm-id: "{{atm_id}}"
+      p-id: "{{p_id}}"
+      cost-center: "{{cost_center}}"
+      env-type: "{{env_type}}"
+  register:   create_vpngw
+  when: VPN_connect
+
+- name: get vpngw id
+  set_fact:
+    vpn_gateway_id:   "{{create_vpngw.vpn_gateway_id}}"
+  when:   create_vpngw.vpn_gateway_id is defined
+  
+
+#create virtual private gateway if direct Connect is true and attched to the vpc
+- name: Create Virtual Private gateway
+  ec2_vpc_vgw:
+    name:   vgw-{{vpc_name}}-{{aws_region}}
+    state:   "present"
+    region:  "{{aws_region}}"
+    vpc_id:  "{{vpcid}}"
+    tags:
+      usage-id: "{{resource_usage_id}}"
+      exp-date: "{{exp_date}}"
+      sd-period: "{{sd_period}}"
+      cloud-dependency: "{{cloud_dependency}}"
+      atm-id: "{{atm_id}}"
+      p-id: "{{p_id}}"
+      cost-center: "{{cost_center}}"
+      env-type: "{{env_type}}"
+  register:   create_vgw
+  when:  direct_connect
+
+- name: get vgw id
+  set_fact:
+    vgw_id:   "{{create_vgw.vgw.id}}"
+  when:   direct_connect
+
+
+
+
+

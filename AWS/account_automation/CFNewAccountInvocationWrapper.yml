@@ -1,0 +1,763 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Wrapper Template containing account automation stacks
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Common parameters used across modules
+        Parameters:
+          - sourceBucket
+          - SecretsManagerRegion
+          - SecretsManagerEndpoint
+          - AnsibleTowerAccountCreds
+          - AnsibleTowerURL
+      - Label:
+          default: Parameters used for base account invocation module
+        Parameters:
+          - OktaEmailAlert
+          - SNOWAPIURL
+          - SNOWParametersFile
+          - ServiceNowCredentials
+          - AccountSchedulerName
+          - AccountSchedulerRegion
+          - ConfluenceURL
+      - Label:
+          default: Parameters used for cloudability module
+        Parameters:
+          - CloudabilitySecret
+      - Label:
+          default: Parameters for creation of KMS Keys within an AWS account
+        Parameters:
+          - KMSServiceAccountCreds
+          - KMSOktaURL
+          - KMSAPIURL
+          - kmsresources
+          - kmsregions
+      - Label:
+          default: Parameters used for enabling SCPs
+        Parameters:
+          - SCPs
+      - Label:
+          default: Parameters used within Baseline Governance IAM module
+        Parameters:
+          - baselineGovernanceIAMStack
+          - baselineGovernanceIAMTemplate
+      - Label:
+          default: Parameters used for Dome9 onboarding module
+        Parameters:
+          - SoteriaProdAccountID
+      - Label:
+          default: Parameters for Config Service module
+        Parameters:
+          - configServiceStack
+          - configServiceTemplate
+          - baselineTagCompStack
+          - baselineTagCompRegion
+          - baselineConformanceStack
+          - baselineConformanceRegion
+      - Label:
+          default: Parameters for Okta Provider module
+        Parameters:
+          - baselineOktaIAMStack
+          - baselineOktaIAMTemplate
+          - OktaDevMetadata
+          - OktaProdMetadata
+      - Label:
+          default: Parameters for Qualys onboarding module
+        Parameters:
+          - QualysBaseUrl
+          - QualysRoleName
+          - QualysSecretName
+      - Label:
+          default: Parameters for Splunk onboarding module
+        Parameters:
+          - baselineSplunkRegion
+          - baselineSplunkStack
+          - KinesisAccountID
+      - Label:
+          default: Parameters for IAM module
+        Parameters:
+          - IAMUserName
+          - SMKMSKeyID
+          - IAMAnsibleTowerURL
+          - IAMVAAnsibleTowerURL
+          - IAMDeveloperVAATURL
+          - BroadAccessVerticalRoleMapping
+          - ReadAccessVerticalRoleMapping
+      - Label:
+          default: Parameters for Email Distribution module
+        Parameters:
+          - EmailDistroAnsibleTowerURL
+      - Label:
+          default: Parameters for AutoTag Governance module
+        Parameters:
+          - AccountCostCenter
+          - AccountPPMCId
+          - AccountTOC
+          - AccountUsageId
+          - AccountExpDate
+          - AccountEnvType
+          - AccountSDPeriod
+      - Label:
+          default: Parameters for Enterprise Support Upgrade module
+        Parameters:
+          - CloudSupportEmailAlert
+          - CompanyName
+      - Label:
+          default: Parameters for Network onboarding module
+        Parameters:
+          - NetworkServiceAccountCreds
+          - NetworkAnsibleTowerURL
+
+Parameters:
+  sourceBucket:
+    Default: organization-repo  
+    Type: String
+  AnsibleTowerURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/jobs/
+    Type: String
+  baselineGovernanceIAMTemplate:
+    Default: acctautomation/CFAccountGovernanceIAMWrapper.yml  
+    Type: String
+  baselineGovernanceIAMStack:
+    Default: CFAccountGovernanceIAMWrapper  
+    Type: String
+  configServiceTemplate:
+    Default: acctautomation/CFAccountConfigServiceWrapper.yml  
+    Type: String
+  configServiceStack:
+    Default: CFAccountConfigServiceWrapper  
+    Type: String
+  baselineOktaIAMTemplate:
+    Default: acctautomation/CFAccountOktaIAMWrapper.yml  
+    Type: String
+  baselineOktaIAMStack:
+    Default: CFAccountOktaIAMWrapper  
+    Type: String
+  baselineSplunkRegion:
+    Default: us-east-1  
+    Type: String
+  baselineSplunkStack:
+    Default: CFAccountBaselineSplunkWrapper  
+    Type: String
+  SecretsManagerEndpoint:
+    Default: https://vpce-03c254aa1a014fa09-8pnhdlfw.secretsmanager.us-east-1.vpce.amazonaws.com
+    Type: String
+  SecretsManagerRegion:
+    Default: us-east-1
+    Type: String
+  IAMAnsibleTowerURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/job_templates/638/launch/
+    Type: String
+  IAMUserName:
+    Default: AnsibleAutomationIAM  
+    Type: String
+  IAMVAAnsibleTowerURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/job_templates/975/launch/
+    Type: String
+  IAMDeveloperVAATURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/job_templates/1037/launch/
+    Type: String
+  BroadAccessVerticalRoleMapping:
+    Default: Broad-access-role
+    Type: String
+  ReadAccessVerticalRoleMapping:
+    Default: Broad-read-role
+    Type: String
+  SMKMSKeyID:
+    Default: 12447d33-798b-4fbb-a53e-fec5c6da7709
+    Type: String
+  NetworkServiceAccountCreds:
+    Default: IAMAccessCredentials
+    Description: Secret name where Network tower credentials are stored
+    Type: String
+  NetworkAnsibleTowerURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/job_templates/1049/launch/
+    Type: String
+  OktaDevMetadata:
+    Default: acctautomation/Okta
+    Type: String
+  OktaProdMetadata:
+    Default: acctautomation/OktaProd
+    Type: String
+  OktaEmailAlert:
+    Default: Directory_Services_Notify@capgroup.com
+    Type: String
+  SNOWAPIURL:
+    Default: https://capitalgroup.service-now.com/api/cgm/incident
+    Type: String
+  SNOWParametersFile:
+    Default: acctautomation/snow-module-parameters.json
+    Type: String
+  AccountSchedulerName:
+    Default: ServiceCatalog-ScheduleCWAccountBuilderRule
+    Type: String
+  AccountSchedulerRegion:
+    Default: us-east-1
+    Type: String
+  ServiceNowCredentials:
+    Default: ServiceNowCredentials
+    Type: String
+  baselineTagCompStack:
+    Default: CFTagComplianceWithOrgConfigWrapper
+    Type: String
+  baselineTagCompRegion:
+    Default: us-west-1
+    Type: String
+  SCPs:
+    Default: p-vrveu81z,p-qzjbj37a
+    Type: String
+  CloudabilitySecret:
+    Default: Cloudability  
+    Type: String
+  QualysBaseUrl:
+    Default:  https://qualysapi.qg2.apps.qualys.com
+    Description: Base URL of the Qualys Server
+    Type: String
+  QualysRoleName:
+    Default: QualysRoleForEC2Connector
+    Description: Name of the Role to Create
+    Type: String
+  QualysSecretName:
+    Default: QualysUserCredentials
+    Description: Name of the secret in Secret Manager storing Qualys credentials
+    Type: String
+  SoteriaProdAccountID:
+     Default: 953351123406
+     Description: AWS Account Number that stores Dome9 Secret
+     Type: String
+  KinesisAccountID:
+     Default: 111417557820
+     Description: AWS Account Number where Kinesis streams are created for Splunk
+     Type: String
+  KMSServiceAccountCreds:
+    Default: KMSServiceAccountCreds
+    Description: Secret name where KMS Okta credentials are stored
+    Type: String
+  KMSOktaURL:
+    Default: https://capgroup.okta.com/oauth2/aus1gdjnsxvx1kTEb1d8/v1/token?grant_type=client_credentials
+    Description: Okta url to generate token for KMS authentication
+    Type: String
+  KMSAPIURL:
+    Default: https://keys.capgroup.com:8443/hsm
+    Description: API url to encrypt generated KMS CMK
+    Type: String
+  AnsibleTowerAccountCreds:
+    Default: IAMAccessCredentials
+    Type: String
+  EmailDistroAnsibleTowerURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/job_templates/840/launch/
+    Type: String
+  AccountCostCenter:
+    Default: 524154
+    Type: String
+  AccountPPMCId:
+    Default: 69058
+    Type: String
+  AccountTOC:
+    Default: ETOC
+    Type: String
+  AccountUsageId:
+    Default: BB00000008
+    Type: String
+  AccountExpDate:
+    Default: 99-00-9999
+    Type: String
+  AccountEnvType:
+    Default: prd
+    Type: String
+  AccountSDPeriod:
+    Default: na
+    Type: String
+  CloudSupportEmailAlert:
+    Default: PDS_-_Platform_Design_services@capgroup.com
+    Type: String
+  CompanyName:
+    Default: The Capital Group of Companies
+    Type: String
+  baselineConformanceStack:
+    Default: CFConformancePackEventRulesWrapper
+    Type: String
+  baselineConformanceRegion:
+    Default: us-east-1
+    Type: String
+  ConfluenceURL:
+    Default: https://confluence.capgroup.com/rest/api/content/282848271
+    Type: String
+Resources:
+  CFNewAccountInvocation:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        OktaEmailAlert: !Ref OktaEmailAlert
+        SNOWAPIURL: !Ref SNOWAPIURL
+        SNOWParametersFile: !Ref SNOWParametersFile
+        AccountSchedulerName: !Ref AccountSchedulerName
+        AccountSchedulerRegion: !Ref AccountSchedulerRegion
+        ServiceNowCredentials: !Ref ServiceNowCredentials
+        IAMServiceAccountCreds: !Ref AnsibleTowerAccountCreds
+        AnsibleTowerURL: !Ref AnsibleTowerURL
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+        ConfluenceURL: !Ref ConfluenceURL
+        LFCloudabilityOnboardArn: !GetAtt CFCloudabilityOnboard.Outputs.LFCloudabilityOnboardArn
+        LFApplySCPArn: !GetAtt CFApplyAccountSCP.Outputs.LFApplySCPArn
+        LFApplyGovernanceIAMRolesArn: !GetAtt CFApplyGovernanceControls.Outputs.LFApplyGovernanceIAMRolesArn
+        LFMiscGovernanceControlsArn: !GetAtt CFApplyGovernanceControls.Outputs.LFMiscGovernanceControlsArn
+        LFDome9OnboardArn: !GetAtt CFDome9Onboard.Outputs.LFDome9OnboardArn
+        LFEnableConfigServiceArn: !GetAtt CFConfigServiceOnboard.Outputs.LFEnableConfigServiceArn
+        LFDeployConfigRulesArn: !GetAtt CFConfigServiceOnboard.Outputs.LFDeployConfigRulesArn
+        LFDeployOktaIAMArn: !GetAtt CFDeployOktaProvider.Outputs.LFDeployOktaIAMArn
+        LFCreateOktaProviderArn: !GetAtt CFDeployOktaProvider.Outputs.LFCreateOktaProviderArn
+        LFOktaEmailAlertArn: !GetAtt CFDeployOktaProvider.Outputs.LFOktaEmailAlertArn
+        LFQualysOnboardArn: !GetAtt CFQualysOnboard.Outputs.LFQualysOnboardArn
+        LFOnboardSplunkArn: !GetAtt CFSplunkOnboard.Outputs.LFOnboardSplunkArn
+        LFSplunkEmailAlertArn: !GetAtt CFSplunkOnboard.Outputs.LFSplunkEmailAlertArn
+        LFGuardDutyOnboardArn: !GetAtt CFGuardDutyOnboard.Outputs.LFGuardDutyOnboardArn
+        LFCreateIAMAutomationCredsArn: !GetAtt CFIAMOnboard.Outputs.LFCreateIAMAutomationCredsArn
+        LFInvokeIAMAnsibleTowerAPIArn: !GetAtt CFIAMOnboard.Outputs.LFInvokeIAMAnsibleTowerAPIArn
+        LFInvokeIAMVATowerAPIArn: !GetAtt CFIAMOnboard.Outputs.LFInvokeIAMVATowerAPIArn
+        LFNewAccountKMSKeysArn: !GetAtt CFKMSOnboard.Outputs.LFNewAccountKMSKeysArn
+        LFInvokeEmailDistroTowerAPIArn: !GetAtt CFEmailDistributionOnboard.Outputs.LFInvokeEmailDistroTowerAPIArn
+        LFGovernanceCWLogAutoTagArn: !GetAtt CFAutoTagGovernanceLogGroups.Outputs.LFGovernanceCWLogAutoTagArn
+        LFUpgradeToEnterrpriseSupportArn: !GetAtt CFUpgradeToEnterpriseSupport.Outputs.LFUpgradeToEnterrpriseSupportArn
+        LFInvokeNetworkTowerAPIArn: !GetAtt CFNetworkOnboard.Outputs.LFInvokeNetworkTowerAPIArn
+        LFAccountMoveIntoOUArn: !GetAtt CFMoveAccountToOU.Outputs.LFAccountMoveIntoOUArn
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFNewAccountInvocation.yml
+  CFCloudabilityOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+        CloudabilitySecret: !Ref CloudabilitySecret
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFCloudabilityOnboard.yml
+  CFApplyAccountSCP:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        SCPs: !Ref SCPs
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFApplyAccountSCP.yml
+  CFApplyGovernanceControls:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        baselineGovernanceIAMStack: !Ref baselineGovernanceIAMStack
+        baselineGovernanceIAMTemplate: !Ref baselineGovernanceIAMTemplate
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFApplyGovernanceControls.yml
+  CFDome9Onboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        SoteriaProdAccountID: !Ref SoteriaProdAccountID
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFDome9Onboard.yml
+  CFConfigServiceOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        configServiceStack: !Ref configServiceStack
+        configServiceTemplate: !Ref configServiceTemplate
+        baselineTagCompStack: !Ref baselineTagCompStack
+        baselineTagCompRegion: !Ref baselineTagCompRegion
+        baselineConformanceStack: !Ref baselineConformanceStack
+        baselineConformanceRegion: !Ref baselineConformanceRegion
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFConfigServiceOnboard.yml
+  CFDeployOktaProvider:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        baselineOktaIAMStack: !Ref baselineOktaIAMStack
+        baselineOktaIAMTemplate: !Ref baselineOktaIAMTemplate
+        OktaDevMetadata: !Ref OktaDevMetadata
+        OktaProdMetadata: !Ref OktaProdMetadata
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFDeployOktaProvider.yml
+  CFQualysOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        QualysBaseUrl: !Ref QualysBaseUrl
+        QualysRoleName: !Ref QualysRoleName
+        QualysSecretName: !Ref QualysSecretName
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFQualysOnboard.yml
+  CFGuardDutyOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFGuardDutyOnboard.yml
+  CFSplunkOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        baselineSplunkRegion: !Ref baselineSplunkRegion
+        baselineSplunkStack: !Ref baselineSplunkStack
+        KinesisAccountID: !Ref KinesisAccountID
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFSplunkOnboard.yml
+  CFIAMOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        IAMUserName: !Ref IAMUserName
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+        SecretsManagerEndpoint: !Ref SecretsManagerEndpoint
+        IAMServiceAccountCreds: !Ref AnsibleTowerAccountCreds
+        SMKMSKeyID: !Ref SMKMSKeyID
+        IAMAnsibleTowerURL: !Ref IAMAnsibleTowerURL
+        IAMVAAnsibleTowerURL: !Ref IAMVAAnsibleTowerURL
+        IAMDeveloperVAATURL: !Ref IAMDeveloperVAATURL
+        BroadAccessVerticalRoleMapping: !Ref BroadAccessVerticalRoleMapping
+        ReadAccessVerticalRoleMapping: !Ref ReadAccessVerticalRoleMapping
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFIAMOnboard.yml
+  CFKMSOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+        KMSServiceAccountCreds: !Ref KMSServiceAccountCreds
+        KMSOktaURL: !Ref KMSOktaURL
+        KMSAPIURL: !Ref KMSAPIURL
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFKMSOnboard.yml
+  CFEmailDistributionOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+        AnsibleTowerAccountCreds: !Ref AnsibleTowerAccountCreds
+        EmailDistroAnsibleTowerURL: !Ref EmailDistroAnsibleTowerURL
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFEmailDistributionOnboard.yml
+  CFAutoTagGovernanceLogGroups:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        AccountCostCenter: !Ref AccountCostCenter
+        AccountPPMCId: !Ref AccountPPMCId
+        AccountTOC: !Ref AccountTOC
+        AccountUsageId: !Ref AccountUsageId
+        AccountExpDate: !Ref AccountExpDate
+        AccountEnvType: !Ref AccountEnvType
+        AccountSDPeriod: !Ref AccountSDPeriod
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFAutoTagGovernanceLogGroups.yml
+  CFUpgradeToEnterpriseSupport:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        ccEmailAddresses: !Ref CloudSupportEmailAlert
+        CompanyName: !Ref CompanyName
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFUpgradeToEnterpriseSupport.yml
+  CFNetworkOnboard:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        SecretsManagerRegion: !Ref SecretsManagerRegion
+        NetworkServiceAccountCreds: !Ref NetworkServiceAccountCreds
+        NetworkAnsibleTowerURL: !Ref NetworkAnsibleTowerURL
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFNetworkOnboard.yml
+  CFMoveAccountToOU:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                                  
+      TemplateURL: https://organization-repo.s3.amazonaws.com/acctautomation/CFMoveAccountToOU.yml

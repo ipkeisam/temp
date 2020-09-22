@@ -1,0 +1,55 @@
+        {
+          "StartAt": "TaskExtractConfigNoncomplaintResources",
+          "States": {
+            "TaskExtractConfigNoncomplaintResources": {
+              "Type": "Task",
+              "Resource": "${LFTagVerifyCompliance.Arn}",
+              "ResultPath": "$",
+              "Next": "TaskCheckResourceArrayForMoreElements"
+            },
+            "TaskCheckResourceArrayForMoreElements": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.no_resources_to_tag",
+                  "BooleanEquals": true,
+                  "Next": "Success"
+                },
+                {
+                  "Variable": "$.has_elements",
+                  "BooleanEquals": true,
+                  "Next": "TaskExtractCloudTrailResourceData"
+                },
+                {
+                  "Variable": "$.finalArrayisEmpty",
+                  "BooleanEquals": true,
+                  "Next": "Success"
+                }                
+              ],
+              "Default": "TaskGetAccountAlias"
+            },
+            "TaskExtractCloudTrailResourceData": {
+              "Type": "Task",
+              "Resource": "${LFTagExtractCloudTrail.Arn}",
+              "Next": "wait_two_seconds"
+            },
+            "wait_two_seconds": {
+              "Type": "Wait",
+              "Seconds": 2,
+              "Next": "TaskCheckResourceArrayForMoreElements"
+            },
+            "TaskGetAccountAlias": {
+              "Type": "Task",
+              "Resource": "${LFTagGetAccountAlias.Arn}",
+              "Next": "TaskSendNotificationByEmail"
+            },
+            "TaskSendNotificationByEmail": {
+              "Type": "Task",
+              "Resource": "${LFTagSendEmail.Arn}",
+              "Next": "Success"
+            },
+            "Success": {
+              "Type": "Succeed"
+            }
+          }
+        }

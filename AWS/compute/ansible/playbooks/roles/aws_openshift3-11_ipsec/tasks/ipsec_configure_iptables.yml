@@ -1,0 +1,89 @@
+---
+
+#
+# Update the rules in /etc/sysconfig/iptables. Append these rules to at the end of the file, but before the last COMMIT statement
+#
+- name: test if 1st rule exists
+  command: 'grep "^-A OS_FIREWALL_ALLOW -i eth0 -p 50 -j ACCEPT"  /etc/sysconfig/iptables'
+  ignore_errors: yes
+  changed_when: false
+  register: test_rule_1
+
+- name: add 1st rule
+  lineinfile:
+    path: /etc/sysconfig/iptables
+    line: '-A OS_FIREWALL_ALLOW -i eth0 -p 50 -j ACCEPT'
+    insertbefore: COMMIT
+    state: present
+  when: not test_rule_1.rc == 0
+
+- name: test if 2nd rule exists
+  command: 'grep "^-A OS_FIREWALL_ALLOW -i eth0 -p 51 -j ACCEPT"  /etc/sysconfig/iptables'
+  ignore_errors: yes
+  changed_when: false
+  register: test_rule_2
+
+- name: add 2nd rule
+  lineinfile:
+    path: /etc/sysconfig/iptables
+    line: '-A OS_FIREWALL_ALLOW -i eth0 -p 51 -j ACCEPT'
+    insertbefore: COMMIT
+    state: present
+  when: not test_rule_2.rc == 0
+
+- name: test if 3rd rule exists
+  command: 'grep "^-A OS_FIREWALL_ALLOW -i eth0 -p udp --dport 500 -j ACCEPT"  /etc/sysconfig/iptables'
+  ignore_errors: yes
+  changed_when: false
+  register: test_rule_3
+
+- name: add 3rd rule
+  lineinfile:
+    path: /etc/sysconfig/iptables
+    line: '-A OS_FIREWALL_ALLOW -i eth0 -p udp --dport 500 -j ACCEPT'
+    insertbefore: COMMIT
+    state: present
+  when: not test_rule_3.rc == 0
+
+- name: test if 4th rule exists
+  command: 'grep "^-A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 383 -j ACCEPT"  /etc/sysconfig/iptables'
+  ignore_errors: yes
+  changed_when: false
+  register: test_rule_4
+
+- name: add 4th rule
+  lineinfile:
+    path: /etc/sysconfig/iptables
+    line: '-A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 383 -j ACCEPT'
+    insertbefore: COMMIT
+    state: present
+  when: not test_rule_4.rc == 0
+
+- name: check if tanium port is open
+  command: 'grep "^-A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 17472 -j ACCEPT"  /etc/sysconfig/iptables'
+  ignore_errors: yes
+  changed_when: false
+  register: test_rule_5
+
+- name: add tanium port
+  lineinfile:
+    path: /etc/sysconfig/iptables
+    line: '-A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 17472 -j ACCEPT'
+    insertbefore: COMMIT
+    state: present
+  when: not test_rule_5.rc == 0
+
+# make the rules active
+- name: execute commands to make rules active
+  block:
+    - command: "iptables -A OS_FIREWALL_ALLOW -i eth0 -p 50 -j ACCEPT"
+    - command: "iptables -A OS_FIREWALL_ALLOW -i eth0 -p 51 -j ACCEPT"
+    - command: "iptables -A OS_FIREWALL_ALLOW -i eth0 -p udp --dport 500 -j ACCEPT"
+    - command: "iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 383 -j ACCEPT"
+    - command: "iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 17472 -j ACCEPT"
+  rescue:
+    - debug: msg='Error enabling iptable rules!'
+
+
+
+

@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create Email distribution for a new account
+Parameters:
+  sourceBucket:
+    Default: organization-repo  
+    Type: String
+  EmailDistroAnsibleTowerURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/job_templates/840/launch/
+    Type: String
+  SecretsManagerRegion:
+    Default: us-east-1
+    Type: String
+  AnsibleTowerAccountCreds:
+    Default: IAMAccessCredentials
+    Type: String
+Resources:
+  LFInvokeEmailDistroTowerAPI:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          SecretsManagerRegionName: !Ref SecretsManagerRegion
+          AnsibleTowerAccountCreds: !Ref AnsibleTowerAccountCreds
+          EMAILDISTRO_ANSIBLE_TOWER_URL: !Ref EmailDistroAnsibleTowerURL
+      Description: This function is the EmailDistro onboarding module 
+      Handler: LFInvokeEmailDistroTowerAPI.lambda_handler
+      Role: !GetAtt 
+        - LFInvokeEmailDistroTowerAPIRole
+        - Arn
+      Runtime: python3.8
+      Layers: 
+        - arn:aws:lambda:us-east-1:848721808596:layer:http-requests:2
+      Timeout: 60
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "acctautomation/LFInvokeEmailDistroTowerAPI.zip"
+        S3ObjectVersion: ".37ZikdEfKny7VJuEcNR9WG7Q8Rk51CG"
+      VpcConfig:
+        SecurityGroupIds: 
+          - sg-029facd71b9750091
+        SubnetIds: 
+          - subnet-0d16801c03a7f80d9
+          - subnet-0e9fb2a1b52350f64 
+  LFInvokeEmailDistroTowerAPIRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: AccountVending-LFInvokeEmailDistroTowerAPIRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFInvokeEmailDistroTowerAPIPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                  - 'ec2:CreateEmailDistroInterface'
+                  - 'ec2:DescribeEmailDistroInterfaces'
+                  - 'ec2:DeleteEmailDistroInterface'
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'kms:Decrypt'
+                  - 'kms:GenerateDataKey'
+                Resource:
+                  - '*'
+  LFInvokeEmailDistroTowerAPILG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFInvokeEmailDistroTowerAPI
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFInvokeEmailDistroTowerAPI
+      RetentionInDays: 14
+
+Outputs:
+  LFInvokeEmailDistroTowerAPIArn:
+    Value: !GetAtt LFInvokeEmailDistroTowerAPI.Arn

@@ -1,0 +1,545 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Event rule(s) for various compliance alerts
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      sourcebucket: organization-repo
+      s3objectversion: 4WsM9VAANJmTwKYXVgwh_bPwxx0ghFb0
+    us-east-2: 
+      sourcebucket: organization-repo-e2
+      s3objectversion: O_g4mRmUKSWS5096bGelNrS23diOMDY8
+    us-west-1: 
+      sourcebucket: organization-repo-w1
+      s3objectversion: U8u.xz_o7nAEuo.ucqyP.XxBVMWgEjja
+    us-west-2: 
+      sourcebucket: organization-repo-w2
+      s3objectversion: cnckwjRQP26VYP3UnNGL3VqtCqqzyzZo
+Parameters:
+  SNSRegion:
+    Default: us-east-1  
+    Type: String
+  SNSTopicARN:
+    Default: arn:aws:sns:us-east-1:848721808596:SNSTopicForComplianceAlerts  
+    Type: String
+Resources:
+  S3ChangeEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Direct all compliance S3 change events to a lambda function
+      EventPattern:
+        source: 
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+        detail:
+          messageType:
+            - ComplianceChangeNotification
+          resourceType:
+            - AWS::S3::Bucket
+            - AWS::S3::AccountPublicAccessBlock
+      Name: S3ComplianceAlert-EventRule
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LFMassageComplianceChangeAlerts"
+              - "Arn"
+          Id: "LFMassageComplianceChangeAlertsProduction"
+  LFMassageComplianceChangeAlerts:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          SNS_REGION: !Ref SNSRegion
+          SNS_TOPIC_ARN: !Ref SNSTopicARN
+      Description: This function checks for non-compliant config changes and sends alerts 
+      Handler: LFMassageComplianceChangeAlerts.lambda_handler 
+      Role: !GetAtt 
+        - LFMassageComplianceChangeAlertsRole
+        - Arn
+      Runtime: python3.8 
+      Timeout: '60'
+      Code:
+        S3Bucket: 
+          !Sub
+            - '${SourceBucket}'
+            - { SourceBucket: !FindInMap [RegionMap, !Ref 'AWS::Region', sourcebucket]}
+        S3Key: "conformancepacks/LFMassageComplianceChangeAlerts.zip"
+        S3ObjectVersion:
+          !Sub
+            - '${S3ObjectVersion}'
+            - { S3ObjectVersion: !FindInMap [RegionMap, !Ref 'AWS::Region', s3objectversion]}
+  LFMassageComplianceChangeAlertsLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFMassageComplianceChangeAlerts
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFMassageComplianceChangeAlerts
+  PermissionForEventsToInvokeLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: 
+        Ref: LFMassageComplianceChangeAlerts
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: 
+          - S3ChangeEventRule
+          - Arn
+  LFMassageComplianceChangeAlertsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFMassageComplianceChangeAlertsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - 'kms:DescribeKey'
+                  - 'kms:List*'
+                  - 'sns:Publish'
+                Resource:
+                  - '*'
+              - Sid: AssumeOrgRole
+                Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: 'arn:aws:iam::*:role/OrganizationAccountAccessRole'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+  MLChangeEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Direct all compliance ML change events to an event bus in Master account
+      EventPattern:
+        source: 
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+        detail:
+          messageType:
+            - ComplianceChangeNotification
+          resourceType:
+            - AWS::SageMaker::NotebookInstance
+            - AWS::SageMaker::EndpointConfig
+      Name: MLComplianceAlert-EventRule
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LFMassageMLComplianceChangeAlerts"
+              - "Arn"
+          Id: "LFMassageMLComplianceChangeAlertsProduction"
+  LFMassageMLComplianceChangeAlerts:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          SNS_REGION: !Ref SNSRegion
+          SNS_TOPIC_ARN: !Ref SNSTopicARN
+      Description: This function checks for non-compliant ML config changes and sends alerts 
+      Handler: index.lambda_handler 
+      Role: !GetAtt 
+        - LFMassageMLComplianceChangeAlertsRole
+        - Arn
+      Runtime: python3.7 
+      Timeout: '60'
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import os
+          import boto3
+          import logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          def send_compliance_alert(message,subject):
+              region = os.environ['SNS_REGION']
+              topicArn = os.environ['SNS_TOPIC_ARN']
+              session = boto3.session.Session()
+              sns_client = session.client(
+                          service_name='sns',
+                          region_name=region
+                      )
+              try:
+                  response = sns_client.publish(
+                      TopicArn=topicArn,
+                      Message=message,
+                      Subject=subject
+                  )
+              except botocore.exceptions.ClientError as e:
+                  print("Error : {}".format(e))
+          def lambda_handler(event, context):
+              try:
+                  detail = event['detail']
+                  if detail['newEvaluationResult']:
+                      complianceType = detail['newEvaluationResult']['complianceType']
+                      if complianceType == "NON_COMPLIANT":
+                          configRuleName = detail['configRuleName']
+                          resourceId = detail['resourceId']
+                          region = detail['awsRegion']
+                          accountid = detail['awsAccountId']
+                          resourceType = detail['resourceType']
+                          subject = "Non compliant resource: " + resourceId + ". Please take remedial action."
+                          message = '\n' + \
+                          'AWS config rule: ' + configRuleName.split(':')[0] + '\n' + \
+                          'AWS config type: ' + complianceType + '\n' + \
+                          'AWS account id: ' + accountid + '\n' + \
+                          'AWS region: ' + region + '\n' + \
+                          'AWS resource type: ' + resourceType + '\n' + \
+                          'AWS resource: ' + resourceId
+                          response = send_compliance_alert(message,subject)
+                      else:
+                          return False
+              except Exception as e:
+                  logger.error('Something went wrong: ' + str(e))
+                  return False
+  LFMassageMLComplianceChangeAlertsLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFMassageMLComplianceChangeAlerts
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFMassageMLComplianceChangeAlerts
+  PermissionForMLEventsToInvokeLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: 
+        Ref: LFMassageMLComplianceChangeAlerts
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: 
+          - S3ChangeEventRule
+          - Arn
+  LFMassageMLComplianceChangeAlertsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFMassageMLComplianceChangeAlertsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+  EncryptionChangeEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Direct all noncompliance change events to an event bus in Master account
+      EventPattern:
+        source: 
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+        detail:
+          messageType:
+            - ComplianceChangeNotification
+          resourceType:
+            - AWS::DynamoDB::Table
+            - AWS::Elasticsearch::Domain
+            - AWS::ApiGateway::Stage
+            - AWS::EFS::FileSystem
+            - AWS::EC2::Volume
+            - AWS::RDS::DBInstance
+            - AWS::CloudTrail::Trail
+      Name: EncryptionComplianceAlert-EventRule
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LFMassageEncryptionComplianceChangeAlerts"
+              - "Arn"
+          Id: "LFMassageEncryptionComplianceChangeAlertsProduction"
+  LFMassageEncryptionComplianceChangeAlerts:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          SNS_REGION: !Ref SNSRegion
+          SNS_TOPIC_ARN: !Ref SNSTopicARN
+      Description: This function checks for non-compliant for Encryption at Rest and send out alerts
+      Handler: index.lambda_handler 
+      Role: !GetAtt 
+        - LFMassageEncryptionComplianceChangeAlertsRole
+        - Arn
+      Runtime: python3.7 
+      Timeout: '60'
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import os
+          import boto3
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          def send_compliance_alert(message,subject):
+              region = os.environ['SNS_REGION']
+              topicArn = os.environ['SNS_TOPIC_ARN']
+              session = boto3.session.Session()
+              sns_client = session.client(
+                          service_name='sns',
+                          region_name=region
+                      )
+              try:
+                  response = sns_client.publish(
+                      TopicArn=topicArn,
+                      Message=message,
+                      Subject=subject
+                  )
+              except botocore.exceptions.ClientError as e:
+                  print("Error : {}".format(e))
+          def lambda_handler(event, context):
+              try:
+                  detail = event['detail']
+                  if detail['newEvaluationResult']:
+                      complianceType = detail['newEvaluationResult']['complianceType']
+                      if complianceType == "NON_COMPLIANT":
+                          configRuleName = detail['configRuleName']
+                          resourceId = detail['resourceId']
+                          region = detail['awsRegion']
+                          accountid = detail['awsAccountId']
+                          resourceType = detail['resourceType']
+                          subject = "Non compliant resource: " + resourceId + ". Please take remedial action."
+                          message = '\n' + \
+                          'AWS config rule: ' + configRuleName.split(':')[0] + '\n' + \
+                          'AWS config type: ' + complianceType + '\n' + \
+                          'AWS account id: ' + accountid + '\n' + \
+                          'AWS region: ' + region + '\n' + \
+                          'AWS resource type: ' + resourceType + '\n' + \
+                          'AWS resource: ' + resourceId
+                          response = send_compliance_alert(message,subject)
+                      else:
+                          return False
+              except Exception as e:
+                  logger.error('Something went wrong: ' + str(e))
+                  return False
+  LFMassageEncryptionComplianceChangeAlertsLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFMassageEncryptionComplianceChangeAlerts
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFMassageEncryptionComplianceChangeAlerts
+  PermissionForEncryptionEventsToInvokeLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: 
+        Ref: LFMassageEncryptionComplianceChangeAlerts
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: 
+          - S3ChangeEventRule
+          - Arn
+  LFMassageEncryptionComplianceChangeAlertsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFMassageEncryptionComplianceChangeAlertsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+  PublicAccessChangeEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Direct all noncompliance change events to an event bus in Master account
+      EventPattern:
+        source: 
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+        detail:
+          messageType:
+            - ComplianceChangeNotification
+          resourceType:
+            - AWS::DynamoDB::Table
+            - AWS::EC2::EIP
+            - AWS::Elasticsearch::Domain
+            - AWS::EC2::SecurityGroup
+            - AWS::EC2::Volume
+            - AWS::EC2::VPC
+            - AWS::RDS::DBInstance
+            - AWS::Redshift::Cluster
+            - AWS::EMR::Cluster
+      Name: PublicAccessComplianceAlert-EventRule
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LFMassagePublicAccessComplianceChangeAlerts"
+              - "Arn"
+          Id: "LFMassagePublicAccessComplianceChangeAlertsProduction"
+  LFMassagePublicAccessComplianceChangeAlerts:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          SNS_REGION: !Ref SNSRegion
+          SNS_TOPIC_ARN: !Ref SNSTopicARN
+      Description: This function checks for non-compliant for Publicly Accessible resources and send out alerts
+      Handler: index.lambda_handler 
+      Role: !GetAtt 
+        - LFMassagePublicAccessComplianceChangeAlertsRole
+        - Arn
+      Runtime: python3.7 
+      Timeout: '60'
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import os
+          import boto3
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          def send_compliance_alert(message,subject):
+              region = os.environ['SNS_REGION']
+              topicArn = os.environ['SNS_TOPIC_ARN']
+              session = boto3.session.Session()
+              sns_client = session.client(
+                          service_name='sns',
+                          region_name=region
+                      )
+              try:
+                  response = sns_client.publish(
+                      TopicArn=topicArn,
+                      Message=message,
+                      Subject=subject
+                  )
+              except botocore.exceptions.ClientError as e:
+                  print("Error : {}".format(e))
+          def lambda_handler(event, context):
+              try:
+                  detail = event['detail']
+                  if detail['newEvaluationResult']:
+                      complianceType = detail['newEvaluationResult']['complianceType']
+                      if complianceType == "NON_COMPLIANT":
+                          configRuleName = detail['configRuleName']
+                          resourceId = detail['resourceId']
+                          region = detail['awsRegion']
+                          accountid = detail['awsAccountId']
+                          resourceType = detail['resourceType']
+                          subject = "Non compliant resource: " + resourceId + ". Please take remedial action."
+                          message = '\n' + \
+                          'AWS config rule: ' + configRuleName.split(':')[0] + '\n' + \
+                          'AWS config type: ' + complianceType + '\n' + \
+                          'AWS account id: ' + accountid + '\n' + \
+                          'AWS region: ' + region + '\n' + \
+                          'AWS resource type: ' + resourceType + '\n' + \
+                          'AWS resource: ' + resourceId
+                          response = send_compliance_alert(message,subject)
+                      else:
+                          return False
+              except Exception as e:
+                  logger.error('Something went wrong: ' + str(e))
+                  return False
+  LFMassagePublicAccessComplianceChangeAlertsLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFMassagePublicAccessComplianceChangeAlerts
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFMassagePublicAccessComplianceChangeAlerts
+  PermissionForPublicAccessEventsToInvokeLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: 
+        Ref: LFMassagePublicAccessComplianceChangeAlerts
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: 
+          - S3ChangeEventRule
+          - Arn
+  LFMassagePublicAccessComplianceChangeAlertsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFMassagePublicAccessComplianceChangeAlertsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'                  
+Outputs: {}

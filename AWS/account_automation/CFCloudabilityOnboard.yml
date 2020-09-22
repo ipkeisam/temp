@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudability Onboarding for a new account
+Parameters:
+  sourceBucket:
+    Default: na  
+    Type: String
+  CloudabilitySecret:
+    Default: na  
+    Type: String
+  SecretsManagerRegion:
+    Default: na
+    Type: String
+Resources:
+  LFCloudabilityOnboard:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          CloudabilitySecret: !Ref CloudabilitySecret
+          SecretsManagerRegionName: !Ref SecretsManagerRegion
+          MasterAccountID: !Ref AWS::AccountId
+      Description: This function deploys Cloudability within new account
+      Handler: LFEnableCloudability.lambda_handler
+      Role: !GetAtt 
+        - LFCloudabilityOnboardRole
+        - Arn
+      Runtime: python3.8 
+      Timeout: 360
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "acctautomation/LFEnableCloudability.zip"
+        S3ObjectVersion: "TQFcNoKUClH1fyqQw7sxec.A.mUNXWrn"
+      Layers: 
+        - arn:aws:lambda:us-east-1:848721808596:layer:http-requests:2
+  LFCloudabilityOnboardLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFCloudabilityOnboard
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFCloudabilityOnboard
+      RetentionInDays: 14
+  LFCloudabilityOnboardRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: AccountVending-LFCloudabilityOnboardRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFCloudabilityOnboardPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+              - Effect: Allow
+                Action:
+                  - 'sts:AssumeRole'
+                  - 'kms:GenerateDataKey'
+                  - 'kms:Decrypt'
+                  - 'secretsmanager:GetSecretValue'
+                Resource:
+                  - '*'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AWSOrganizationsFullAccess'
+
+Outputs:
+  LFCloudabilityOnboardArn:
+    Value: !GetAtt LFCloudabilityOnboard.Arn

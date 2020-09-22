@@ -1,0 +1,198 @@
+---
+  
+##### 
+# These playbook is for configuring IPSEC on a new node 
+# It should only meant to run as post install of OCP is completed and on control/bastion host
+# To run:  ansible-playbook -i < inventory cfg file > scaleup_ocp_ipsec_playbook.yml
+# ansible-playbook -i ../ocp-provisioning/ocp-ext-qa-west.cfg scaleup_ocp_ipsec_playbook.yml -e env_var_file=ext_qa_us_west_1.yml
+#  Remember to replace <ENV_VAR_FILE> with the appropriate env variable file under vars/
+#
+#  LastUpdated: 2019-01-22
+#  UpdatedBy: Philip Phan ( phlp@capgroup.com )
+#
+
+- hosts: all
+  gather_facts: false
+  tasks:
+  #- name: set global variable file to use throughout the playbook
+    #set_fact: 
+      #openshift_aws_env_var_file: <ENV_VAR_FILE> 
+ 
+  - name: include env file to work around ansible 2.4 issue
+    include_vars: roles/openshift/vars/{{ env_var_file }}
+
+- hosts: masters[0]
+  gather_facts: false
+
+  vars:
+    list_of_pods_to_delete: [] 
+
+  tasks:
+  - name: Generate certs for each new node in the cluster
+    shell:
+      oc adm ca create-server-cert --signer-cert=/home/{{ansible_user}}/ipsec2/ca.crt --signer-key=/home/{{ansible_user}}/ipsec2/ca.key --signer-serial=/home/{{ansible_user}}/ipsec2/ca.serial.txt --cert=/home/{{ansible_user}}/ipsec2/servers/{{ item }}.crt --key=/home/{{ansible_user}}/ipsec2/servers/{{ item }}.key --hostnames={{ item }}
+    with_items: "{{ groups['new_nodes'] }}"
+
+  - name: Retrieve ca crt file from master
+    fetch:
+      src: ipsec2/ca.crt
+      dest: /home/{{ansible_user}}/ipsec_certs/
+      flat: yes
+      fail_on_missing: yes
+
+  - name: Fetch node certificate from master to bastion 
+    fetch:
+      src: ipsec2/servers/{{ item }}.crt
+      dest: /home/{{ansible_user}}/ipsec_certs/
+      flat: yes
+      fail_on_missing: yes
+    with_items: "{{ groups['new_nodes'] }}"
+
+  - name: Fetch node key from master to bastion
+    fetch:
+      src: ipsec2/servers/{{ item }}.key
+      dest: /home/{{ansible_user}}/ipsec_certs/
+      flat: yes
+      fail_on_missing: yes
+    with_items: "{{ groups['new_nodes'] }}"
+
+  - name: Retrieve ovs and sdn pods of new_nodes
+    shell: oc get pod -o wide -n openshift-sdn | grep -ie {{ item }} | awk '{ print $1 }'
+    with_items: "{{ groups['new_nodes'] }}"
+    register: list_of_sdn_pods
+
+  - name: Output list of sdn pods
+    debug:
+      msg: "{{ item.stdout_lines }}"
+    loop: "{{ list_of_sdn_pods.results }}"
+
+
+  - name: Create list of sdn and ovs pods to delete
+    set_fact:
+      list_of_pods_to_delete: "{{ list_of_pods_to_delete|default([]) + [item.stdout_lines] }}"
+    loop: "{{ list_of_sdn_pods.results }}"
+
+  - name: output list of pods
+    debug:
+      msg: "{{ list_of_pods_to_delete[0] }}"        
+  
+  - name: delete pods
+    shell: oc delete pod {{ item[0] }} {{ item[1] }} -n openshift-sdn
+    loop: "{{ list_of_pods_to_delete }}"
+
+
+- hosts: new_nodes
+  tasks:
+  - name: Copy over generated cert files to all nodes
+    copy:
+      src: /home/{{ansible_user}}/ipsec_certs/
+      dest: /etc/origin/node/generated_certs/
+      owner: root
+      group: root
+      mode: u=rw,g=r,o=r
+
+  - name: yum install libreswan
+    yum:
+      name: libreswan
+      state: latest
+ 
+  # pause for 10 secs before proceeding
+  - name: pause a bit before continuing
+    pause:
+      seconds: 15
+
+  - name: initialize NSS database 
+    shell: ipsec initnss
+
+  - name: combine node certs into a PKCS12 file
+    shell: 'openssl pkcs12 -export -in /etc/origin/node/generated_certs/{{ ansible_fqdn }}.crt -inkey /etc/origin/node/generated_certs/{{ ansible_fqdn }}.key -certfile /etc/origin/node/generated_certs/ca.crt -passout pass: -out /tmp/mypkcs'
+  
+  - name: Load the generated PKCS#12 file into the NSS database
+    shell: 'pk12util -i /tmp/mypkcs -d sql:/etc/ipsec.d -W ""'
+
+  - name: delete the generated PKCS12 file
+    file: path='/tmp/mypkcs' state=absent
+
+- hosts: new_nodes
+  tasks:
+  - name: create openshift cluster config /etc/ipsec.d/openshift-cluster.conf
+    include_role:
+      name: aws_openshift3-11_ipsec
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_create_copy_cluster_conf.yml
+    when: openshift_create_and_copy_cluster_conf
+
+- hosts: localhost
+  connection: local
+  tasks:
+  - name: include env file to work around ansible 2.4 issue
+    include_vars: roles/aws_openshift3-11_ipsec/vars/{{ env_var_file }}
+
+  - name: create private and clear policies 
+    include_role:
+      name: aws_openshift3-11_ipsec
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_create_policies.yml
+    when: openshift_create_policies
+
+- hosts: new_nodes
+  tasks:
+  - name: copy private and clear policies to /etc/ipsec.d/ directory
+    include_role:
+      name: aws_openshift3-11_ipsec
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_copy_policies.yml
+    when: openshift_copy_policies
+
+  - name: configure iptables
+    include_role:
+      name: aws_openshift3-11_ipsec
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_configure_iptables.yml
+    when: openshift_configure_iptables 
+
+- hosts: nodes
+  gather_facts: false
+  tasks:
+  - name: prompt for user whether to continue or not
+    pause: prompt='Please confirm you want to start IPSec! Press return to continue. Press Ctrl+c and then "a" to abort'
+
+  - name: start ipsec on all nodes
+    service:
+      name: ipsec
+      state: started
+
+- hosts: new_nodes
+  gather_facts: false
+  tasks:
+  - name: start ipsec on all new nodes
+    service:
+      name: ipsec
+      state: started
+
+- hosts: masters[0]
+  gather_facts: false
+  tasks:
+  - name: verify cluster is communicating properly
+    shell: 'oc get pods --all-namespaces'  
+
+- hosts: nodes
+  gather_facts: false
+  tasks:
+  - name: prompt for user whether to continue or not
+    pause: prompt='Please confirm you want to enable IPSec! Press return to continue. Press Ctrl+c and then "a" to abort'
+
+  - name: enable IPSec on all nodes
+    service:
+      name: ipsec
+      state: started
+      enabled: yes  
+
+- hosts: new_nodes
+  gather_facts: false
+  tasks:
+  - name: enable IPSec on new_nodes
+    service:
+      name: ipsec
+      state: started
+      enabled: yes   

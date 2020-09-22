@@ -1,0 +1,230 @@
+---
+  
+##### 
+# These playbook to run after host provisioning, prior to OCP install and base agent install
+# It should only be run on the OCP control/bastion host  
+# 
+# Configure the following:
+#  - create, format and mount etcd or origin volume
+#  - configure ssh for password authentication and harden ssh
+#  - enable ryslog 
+#  - provision service now local accounts and setup sudo access
+#  - dual nic configuration ( optional )
+#  - install latest security updates
+#
+# Instruction:  
+#    To run:
+#      1. Source AWS credentials ( make sure that it corresponds to the account and environment that is being worked on)
+#      2: Run playbook: ansible-playbook -i ocp_hosts.ini -e "host_name=<private_dns_hostname> env_var_file=<env var file name> mount_type=<origin or etcd> device_type=<nvme or ssd>"  --private-key=<private key file name> -u ec2-user ocp_post_playbook.yml
+#
+# Example:  ansible-playbook -i ocp_hosts.ini -e "host_name=ip-10-211-81-210.ec2.internal env_type=prd env_var_file=ext_prod_us_east_1.yml aws_device_name=/dev/sdc device_name=/dev/xvdc mount_type=origin device_type=ssd" --private-key=/home/ec2-user/ocp-provisioning/ocp-ext-prod-us-east-1.pem -u ec2-user ocp_post_playbook.yml
+# 
+# extra-vars options 
+#  --------------------------------------------------------------------------------------------------------------------
+#  |  variable name           |       value                 |    require or optionanl   |     comments
+#  ---------------------------------------------------------------------------------------------------------------------
+#  | env_type                 | dev, qa or prd              |    optional               | if not define uses openshift_aws_env_type in env var file 
+#  ---------------------------------------------------------------------------------------------------------------------
+#  | env_var_file             | env specif var file         |    require                | located under roles/openshift/vars/
+#  ---------------------------------------------------------------------------------------------------------------------
+
+#  
+#
+#  LastUpdated: 2019-07-22
+#  CreatedBy: Philip Phan ( phlp@capgroup.com )
+
+- name: Create ssh key
+  hosts: localhost
+  gather_facts: false
+  vars:  
+    utils_rsyslog_install: True
+    utils_unix_local_acct: True
+    ansible_user: ec2-user
+
+  tasks:
+
+  - name: Check if ssh key already exists on bastion VM
+    stat:
+      path: /home/{{ ansible_user }}/.ssh/id_rsa.pub
+    register: ssh_key_stats
+
+  - name: Create ssh key for VM
+    shell:
+      ssh-keygen -t rsa -b 2048 -f /home/{{ ansible_user }}/.ssh/id_rsa -N ''
+    when: ssh_key_stats.stat.exists == false
+
+  - name: install ryslsog in Linux
+    become: yes
+    import_role:
+      name: splunk
+      tasks_from: rsyslog.yml
+    when: utils_rsyslog_install | default(False) | bool
+
+  # for now only provision service now accts
+  - name: provision local accounts
+    become: yes
+    import_role:
+      name: utils
+      tasks_from: provision_unix_accounts.yml
+    vars:
+      env_type: "{{ openshift_aws_env_type }}"      
+    when: utils_unix_local_acct | default(False) | bool
+
+  - name: secure ssh config and set localtime to PST
+    become: yes
+    block:
+      # update sshd_config and cloud.cfg to allow password auth
+#      - command: "sed -i 's/^ssh_pwauth:.*/ssh_pwauth:   1/' /etc/cloud/cloud.cfg"
+#      - command: "sed -i 's/^PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
+      - lineinfile:
+          path: /etc/cloud/cloud.cfg
+          regexp: '^(.*)ssh_pwauth:(.*)$'
+          line: 'ssh_pwauth:   1'
+          backrefs: yes 
+      - lineinfile:
+          path: /etc/ssh/sshd_config
+          regexp: '^(.*)PasswordAuthentication no'
+          line: 'PasswordAuthentication yes'
+          backrefs: yes          
+      # only allow strong ciphers for ssh
+      - lineinfile:
+          path: /etc/ssh/ssh_config
+          insertafter: "#   Protocol 2"
+          line: "MACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160" 
+          backup: no      
+      - lineinfile:
+          path: /etc/ssh/ssh_config
+          insertafter: "#   Protocol 2"
+          line: "Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour" 
+          backup: no
+      - lineinfile:
+          path: /etc/ssh/sshd_config
+          insertafter: "#RekeyLimit default none"
+          line: "MACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160" 
+          backup: no      
+      - lineinfile:
+          path: /etc/ssh/sshd_config
+          insertafter: "#RekeyLimit default none"
+          line: "Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour" 
+          backup: no                
+      - service: name=sshd state=restarted 
+      # update locatime to America/Los_Angeles zone
+#      - command: rm -f /etc/localtime
+#      - command: ln -s /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
+      - name: remove /etc/localtime symlink
+        file:
+          path: /etc/localtime
+          state: absent
+      - name: setup /etc/localtime symlink to America/Los_Angeles zone
+        file: 
+          path: /etc/localtime 
+          src: /usr/share/zoneinfo/America/Los_Angeles
+          state: link 
+          force: yes
+
+- hosts: nodes
+  gather_facts: false
+
+  vars:  
+    utils_rsyslog_install: True
+    utils_unix_local_acct: True
+    ansible_user: ec2-user
+
+  tasks:
+  - fail:
+      msg: "{{ item }} needs to be defined"
+    when: item not in vars
+    with_items:
+    - env_type
+
+  - name: copy in the bastion key to all
+    become: yes
+    authorized_key:
+      user: "{{ ansible_user }}"
+      state: present
+      key: "{{ lookup('file', '/home/{{ ansible_user }}/.ssh/id_rsa.pub') }}"
+
+
+  - name: secure ssh config and set localtime to PST
+    become: yes
+    block:
+      # update sshd_config and cloud.cfg to allow password auth
+#      - command: "sed -i 's/^ssh_pwauth:.*/ssh_pwauth:   1/' /etc/cloud/cloud.cfg"
+#      - command: "sed -i 's/^PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
+      - lineinfile:
+          path: /etc/cloud/cloud.cfg
+          regexp: '^(.*)ssh_pwauth:(.*)$'
+          line: 'ssh_pwauth:   1'
+          backrefs: yes 
+      - lineinfile:
+          path: /etc/ssh/sshd_config
+          regexp: '^(.*)PasswordAuthentication no'
+          line: 'PasswordAuthentication yes'
+          backrefs: yes          
+      # only allow strong ciphers for ssh
+      - lineinfile:
+          path: /etc/ssh/ssh_config
+          insertafter: "#   Protocol 2"
+          line: "MACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160" 
+          backup: no      
+      - lineinfile:
+          path: /etc/ssh/ssh_config
+          insertafter: "#   Protocol 2"
+          line: "Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour" 
+          backup: no
+      - lineinfile:
+          path: /etc/ssh/sshd_config
+          insertafter: "#RekeyLimit default none"
+          line: "MACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160" 
+          backup: no      
+      - lineinfile:
+          path: /etc/ssh/sshd_config
+          insertafter: "#RekeyLimit default none"
+          line: "Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour" 
+          backup: no                
+      - service: name=sshd state=restarted 
+      # update locatime to America/Los_Angeles zone
+#      - command: rm -f /etc/localtime
+#      - command: ln -s /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
+      - name: remove /etc/localtime symlink
+        file:
+          path: /etc/localtime
+          state: absent
+      - name: setup /etc/localtime symlink to America/Los_Angeles zone
+        file: 
+          path: /etc/localtime 
+          src: /usr/share/zoneinfo/America/Los_Angeles
+          state: link 
+          force: yes
+
+  - name: install ryslsog in Linux
+    become: yes
+    import_role:
+      name: splunk
+      tasks_from: rsyslog.yml
+    when: utils_rsyslog_install | default(False) | bool
+
+  # for now only provision service now accts
+  - name: provision local accounts
+    become: yes
+    import_role:
+      name: utils
+      tasks_from: provision_unix_accounts.yml
+    vars:
+      env_type: "{{ openshift_aws_env_type }}"      
+    when: utils_unix_local_acct | default(False) | bool
+
+  - name: refresh yum repo 
+    become: yes
+    command: yum repolist
+
+  - name: install latest OS updates
+    become: yes
+    yum:
+      name: '*'
+      security: yes      
+      state: latest
+
+  - name: Rebooting ...
+    become: yes
+    command: shutdown -r now "Reboot required for updated kernel"

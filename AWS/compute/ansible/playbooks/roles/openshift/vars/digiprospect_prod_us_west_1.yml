@@ -1,0 +1,98 @@
+---
+
+###
+# start of block for Digital Prospecting Pilot us-west-1
+###
+
+openshift_aws_ppmc_id: "79969" 
+
+openshift_aws_ssh_key_name: digiprospect-prod-ocp-us-west-1
+openshift_aws_rootenc_ami: ami-04294c9fac29c660f
+openshift_aws_volume_kms_key_id: e59fa80c-a034-46e6-8e37-2a66748ad933
+
+openshift_aws_clusterid: vpc1_digiprospect_prod-us-west-1-digiprospect-prod
+openshift_aws_region: us-west-1
+openshift_aws_env_type: prd
+
+# define instance types
+openshift_aws_ec2_control_instance_type: t2.medium
+openshift_aws_ec2_master_instance_type: m4.xlarge
+openshift_aws_ec2_app_instance_type: t2.xlarge
+openshift_aws_ec2_infra_instance_type: m4.xlarge
+
+# subnet information
+openshift_aws_control_host_subnet: 
+  - { admin_subnet: subnet-0bef9632639f32253, cluster_subnet: subnet-08a83bc06a9a276b2, az: us-west-1a } 
+
+openshift_aws_admin_subnet_1: 
+  - { subnet: subnet-0bef9632639f32253, az: us-west-1a, count: 1 }
+openshift_aws_admin_subnet_2:
+  - { subnet: subnet-0324d7709547978bc, az: us-west-1b, count: 1 }
+openshift_aws_admin_subnet_3:
+  - { subnet: subnet-0b0b859b108124cd7, az: us-west-1b, count: 1 }
+
+openshift_aws_cluster_subnet_1: 
+  - { subnet: subnet-08a83bc06a9a276b2, az: us-west-1a }
+openshift_aws_cluster_subnet_2:  
+  - { subnet: subnet-04a2467a074e11826, az: us-west-1b }
+openshift_aws_cluster_subnet_3:  
+  - { subnet: subnet-06763d5a90059c145, az: us-west-1b }
+
+
+# ELB subnets
+# ELB cannot be attached to multiple subnets in the same AZ,
+# so will need to comment out one of the 1b subnet
+openshift_elb_externalsubnets: 
+  - subnet-08d0eef9f4422f1e1
+  - subnet-090b3bd7ddab7fa20
+#  - subnet-0734363a666999a80
+
+openshift_elb_internalsubnets:
+  - subnet-07422b0295dd53b90
+  - subnet-07dd0e0fdcfe4f703
+#  - subnet-0cc17139f226b4821
+
+# openshift tagging
+openshift_aws_kubernetes_tag_id: digiprospect-prod
+
+openshift_aws_resource_tags:
+  Name: "{{ openshift_aws_resource_type }}"
+  usage-id: "{{ openshift_aws_atm_id }}"
+  cost-center: ""
+  sec-profile: normal
+  exp-date: 99-00-9999
+  sd-period: na
+  p-id: "{{ openshift_aws_ppmc_id }}"
+  env-type: "{{ openshift_aws_env_type }}"
+  cloud-dependency: cloudonly
+  app-type: "{{ openshift_aws_resource_type }}"
+  kubernetes.io/cluster/cluster-digiprospect-prod: "{{ openshift_aws_kubernetes_tag_id }}"
+  site: aws
+
+#
+# the following section contains variables to create the inventory configuration file
+#
+# define the internal master hostname
+# ex. ocp-console-int.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_internal_master_vip:
+# define the master hostname: 
+# ex. ocp-console<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com 
+openshift_aws_master_vip:
+# define the the default master subdomain
+# ex. apps.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_router_vip:
+# define the EBS availability zone for loggging
+# ex. us-west-1a 
+openshift_aws_logging_ebs_zone:
+# define the EBS availability zone for metrics
+# ex. us-west-1c 
+openshift_aws_metric_ebs_zone:
+# define the s3 bucket name
+# ex. ocp-capgroup-<project name>-<env>-<region>
+openshift_aws_s3_bucket_name:
+openshift_aws_s3_bucket_region: "{{ openshift_aws_region }}"
+openshift_aws_cluster_name: "{{ openshift_aws_kubernetes_tag_id }}" 
+
+####
+# end of block for Digital Prospecting Pilot us-west-1
+###

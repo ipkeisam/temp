@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Enable Config Service and config rules and alerts for a new account
+Parameters:
+  sourceBucket:
+    Default: na  
+    Type: String
+  configServiceTemplate:
+    Default: na  
+    Type: String
+  configServiceStack:
+    Default: na  
+    Type: String
+  baselineTagCompStack:
+    Default: na
+    Type: String
+  baselineTagCompRegion:
+    Default: na
+    Type: String
+  baselineConformanceStack:
+    Default: na
+    Type: String
+  baselineConformanceRegion:
+    Default: na
+    Type: String
+Resources:
+  LFEnableConfigService:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          SourceBucket: !Ref sourceBucket
+          ConfigServiceStack: !Ref configServiceStack
+          ConfigServiceTemplate: !Ref configServiceTemplate
+      Description: This function enables Config Service within a new account. 
+      Handler: LFAccountConfigService.lambda_handler
+      Role: !GetAtt 
+        - LFEnableConfigServiceRole
+        - Arn
+      Runtime: python3.8 
+      Timeout: 300
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "acctautomation/LFAccountConfigService.zip"
+        S3ObjectVersion: "Nj.tf5cKv70CZGFfA2DtGs4gluiUulSb"
+  LFEnableConfigServiceLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFEnableConfigService
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFEnableConfigService
+      RetentionInDays: 14
+  LFEnableConfigServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: AccountVending-LFEnableConfigServiceRole
+      Path: /service-role/
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFEnableConfigServicePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+              - Sid: AssumeOrgRole
+                Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: 'arn:aws:iam::*:role/OrganizationAccountAccessRole'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+      - 'arn:aws:iam::aws:policy/AWSOrganizationsFullAccess'
+      - 'arn:aws:iam::aws:policy/AWSCloudFormationFullAccess'
+  LFDeployConfigRules:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Description: This function deploys config rules for a new account. 
+      Handler: LFNewAccountConfigRules.lambda_handler
+      Role: !GetAtt 
+        - LFDeployConfigRulesRole
+        - Arn
+      Runtime: python3.8 
+      Timeout: 360
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "acctautomation/LFNewAccountConfigRules.zip"
+        S3ObjectVersion: "y_DRIc3Lzet3j2iJf1E_hnZEzAHMbIAN"
+  LFDeployConfigRulesLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFDeployConfigRules
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFDeployConfigRules
+      RetentionInDays: 14
+  LFDeployConfigRulesRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: AccountVending-LFDeployConfigRulesRole
+      Path: /service-role/
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFDeployConfigRulesPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+      - 'arn:aws:iam::aws:policy/service-role/AWSConfigRulesExecutionRole'
+      - 'arn:aws:iam::aws:policy/AWSOrganizationsFullAccess'
+Outputs:
+  LFEnableConfigServiceArn:
+    Value: !GetAtt LFEnableConfigService.Arn
+  LFDeployConfigRulesArn:
+    Value: !GetAtt LFDeployConfigRules.Arn

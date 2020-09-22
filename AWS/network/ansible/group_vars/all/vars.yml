@@ -1,0 +1,10 @@
+---  
+ansible_connection: local
+
+ # AWS Credentials
+aws_secret_key:  "{{vault_aws_secret_key}}"
+aws_access_key:  "{{vault_aws_access_key}}"
+
+#this should be handle in ansible.cfg instead
+#ansible_python_interpreter: /Users/sxm/anaconda/bin/python
+ansible_python_interpreter: /usr/local/bin/python

@@ -1,0 +1,37 @@
+---
+- hosts: '{{ hosts_value }}'
+  become: true
+  become_user: root
+  become_method: sudo
+  gather_facts: no
+
+  vars:
+    aws_region: "{{ my_region }}"
+    atm_id: "{{ atm_id }}"
+    cloudwatch_agent_install: True
+    cloudwatch_agent_update_config: False
+    cloudwatch_create_iam_role: False
+
+  tasks:
+  - name: Install CloudWatch Agent
+    import_role:
+      name: cloudwatch_agent
+      tasks_from: install.yml
+    when: cloudwatch_agent_install | default(True) | bool
+
+  tasks:
+  - name: Update CloudWatch Agent Config
+    import_role:
+      name: cloudwatch_agent
+      tasks_from: update_config.yml
+    when: cloudwatch_agent_update_config | default(True) | bool
+
+- hosts: '{{ hosts_value }}'
+  gather_facts: no
+
+  tasks:
+  - name: Create IAM role and policy for EC2 instances
+    import_role:
+      name: cloudwatch_agent
+      tasks_from: create_iam_role.yml
+    when: cloudwatch_create_iam_role | default(True) | bool

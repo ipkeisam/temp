@@ -1,0 +1,118 @@
+---
+
+###
+# start of block EXT-PRD us-east-1
+###
+openshift_aws_ssh_key_name: ocp-ext-prod-us-east-1
+openshift_aws_rootenc_ami: ami-50040b2f
+openshift_aws_volume_kms_key_id: d8e4fece-0672-44f8-86e4-0f01ef23431f
+
+openshift_aws_clusterid: vpc2_extprod-us-east-1-ext-prod
+openshift_aws_region: us-east-1
+openshift_aws_env_type: prd
+
+# define instance types
+openshift_aws_ec2_control_instance_type: t2.medium
+openshift_aws_ec2_master_instance_type: m5.2xlarge
+#openshift_aws_ec2_app_instance_type: m5.2xlarge
+openshift_aws_ec2_app_instance_type: m4.2xlarge
+openshift_aws_ec2_infra_instance_type: m5.2xlarge
+
+# misc flags
+openshift_aws_dual_nic: False
+openshift_aws_external_facing: True
+nvme: true
+
+# subnet information
+openshift_aws_control_host_subnet: 
+  - { admin_subnet: subnet-9fad44b1, cluster_subnet: subnet-3f57b911, az: us-east-1a } 
+
+openshift_aws_admin_subnet_1: 
+  - { subnet: subnet-9fad44b1, az: us-east-1a, count: 1 }
+openshift_aws_admin_subnet_2:
+  - { subnet: subnet-e72b9bad, az: us-east-1b, count: 1 }
+openshift_aws_admin_subnet_3:
+  - { subnet: subnet-3264886e, az: us-east-1c, count: 1 }
+
+openshift_aws_cluster_subnet_1: 
+  - { subnet: subnet-3f57b911, az: us-east-1a }
+openshift_aws_cluster_subnet_2:  
+  - { subnet: subnet-3f01b175, az: us-east-1b }
+openshift_aws_cluster_subnet_3:  
+  - { subnet: subnet-c165899d, az: us-east-1c }
+
+#OCPRouter
+# External 1 & 2
+openshift_elb_externalsubnets: 
+  - subnet-dba34af5
+  - subnet-ce13a384
+  - subnet-f51ef2a9
+
+openshift_elb_internalsubnets:
+  - subnet-ba52bc94
+  - subnet-5213a318
+  - subnet-7165892d
+
+# openshift tagging
+openshift_aws_kubernetes_tag_id: prod1-useast1
+
+openshift_aws_resource_tags:
+  Name: "{{ openshift_aws_resource_type }}"
+  usage-id: "{{ openshift_aws_atm_id }}"
+  cost-center: "{{ openshift_aws_cost_center }}"
+  sec-profile: normal
+  exp-date: 99-00-9999
+  sd-period: na
+  ppmc-id: "{{ openshift_aws_ppmc_id }}"
+  env-type: "{{ openshift_aws_env_type }}"
+  cloud-dependency: cloudonly
+  app-type: "{{ openshift_aws_resource_type }}"
+  kubernetes.io/cluster/cluster-EXT-PROD: "{{ openshift_aws_kubernetes_tag_id }}"
+  site: aws
+  toc: ETOC
+
+#
+# the following section contains variables to create the inventory configuration file
+#
+# define the internal master hostname
+# ex. ocp-console-int.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_internal_master_vip: ocp-console-int.prod-ext-use1-aws.csp.capgroup.com
+# define the master hostname: 
+# ex. ocp-console<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com 
+openshift_aws_master_vip: ocp-console.prod-ext-use1-aws.csp.capgroup.com
+# define the the default master subdomain
+# ex. apps.<env>-<nad, digital, etc.>-<usw1, use1>-aws.csp.capgroup.com
+openshift_aws_router_vip: apps.prod-ext-use1-aws.csp.capgroup.com
+# define the EBS availability zone for loggging
+# ex. us-west-1a 
+openshift_aws_logging_ebs_zone: us-east-1a
+# define the EBS availability zone for metrics
+# ex. us-west-1c 
+openshift_aws_metric_ebs_zone: us-east-1b
+# define the s3 bucket name
+# ex. ocp-capgroup-<project name>-<env>-<region>
+openshift_aws_s3_bucket_name: ocp-capgroup-ext-prod-east1
+openshift_aws_s3_bucket_region: "{{ openshift_aws_region }}"
+openshift_aws_cluster_name: "{{ openshift_aws_kubernetes_tag_id }}" 
+
+openshift_aws_env: ext-prod-east1
+openshift_create_and_copy_cluster_conf: True
+openshift_create_policies: True
+openshift_copy_policies: True
+openshift_configure_iptables: True
+
+openshift_aws_s3_access_key: AKIAJLQ375V2WNONM7PA
+openshift_aws_s3_secret_key: 
+openshift_aws_ec2_access_key: AKIAII7PTUOIWK6NY2VQ
+openshift_aws_ec2_secret_key: 
+
+#AWS Resource Name
+aws_controlhost_type: OCP2 Control Host
+aws_masterhost_type: OCP2 Master Host
+aws_infrahost_type: OCP2 Infra Host
+aws_apphost_type: OCP2 App Host
+aws_loadbalancer_type: OCP2 Load Balancer
+
+#Outcold Tag
+outcold_cluster_tag_key: prod-ext-use1-aws.cluster
+outcold_appnode_tag_key: prod-ext-use1-aws.appnode

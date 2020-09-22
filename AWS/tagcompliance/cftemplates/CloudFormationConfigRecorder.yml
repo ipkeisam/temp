@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create Config Recorder
+Parameters:
+  EnvironmentType:
+    Default: ftdev
+    Type: String
+    AllowedValues: 
+      - ftdev
+      - dev
+      - qa
+      - prod
+Resources:
+  ConfigRecorder: 
+    Type: AWS::Config::ConfigurationRecorder
+    Properties: 
+        Name: default
+        RecordingGroup: 
+          AllSupported: true
+          IncludeGlobalResourceTypes: true
+        RoleARN: 
+            Fn::GetAtt: 
+                - ConfigRecorderRole
+                - Arn
+  DeliveryChannel:
+    Type: AWS::Config::DeliveryChannel
+    Properties:
+      ConfigSnapshotDeliveryProperties:
+        DeliveryFrequency: Six_Hours
+      S3BucketName: !Ref 'ConfigBucket'
+  ConfigBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'aws:kms'
+      Tags:
+      - Key: ppmc-id
+        Value: '69058'
+      - Key: cost-center
+        Value: '524154'
+      - Key: usage-id
+        Value: BB00000008
+      - Key: toc
+        Value: ETOC
+      - Key: exp-date
+        Value: 99-00-9999
+      - Key: env-type
+        Value: !Ref EnvironmentType
+      - Key: sd-period
+        Value: na
+  ConfigRecorderRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSConfigRole'
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: s3:GetBucketAcl
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref 'ConfigBucket']]
+          - Effect: Allow
+            Action: s3:PutObject
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref 'ConfigBucket', /AWSLogs/,
+                !Ref 'AWS::AccountId', /*]]
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+          - Effect: Allow
+            Action: config:Put*
+            Resource: '*'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 3349c1e0-afde-4347-9e1a-7a58f9d7e91d

@@ -1,0 +1,84 @@
+###################################################################################
+# This template creates an S3 bucket using the Create S3 bucket Service Catalog product
+###################################################################################
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+ This template creates an S3 bucket using the Create S3 bucket Service Catalog product
+
+# This section allows the development team to pass values into the template to customize the AWS Service Catalog Product
+Parameters:
+  S3BucketName:
+    Description: "The name of the S3 bucket, should not contain upper case letters and underscores. Should start with a letter or number."
+    Type: String
+
+  S3BucketRegion:
+    Description: "Region where bucket has to be provisioned within the account"
+    Default : "us-east-1"
+    Type: String
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+      - us-west-1
+      - us-west-2
+
+  EnableReplicationInProd:
+    Description: "Is Bucket Replication required 'true' or 'false' (only if Prod)?"
+    Default: na
+    Type: String
+    AllowedValues:
+      - na
+      - yes
+      - no
+
+  DestinationRegion:
+    Description: "Destination region for bucket replication (different from source bucket region)"
+    Default : "na"
+    Type: String
+    AllowedValues:
+      - na
+      - us-east-1
+      - us-east-2
+      - us-west-1
+      - us-west-2
+
+  S3ProductId:
+    Description: Product Id for the S3 Product
+    Type: String
+    Default: "prod-owlqzponjnkac"
+  S3ArtifactId:
+    Description: Artifact Id (version) for the S3 product
+    Type: String
+    Default: "pa-tbe2i4gvgob5y"
+
+Resources:
+ S3Bucket:
+  Type: "AWS::ServiceCatalog::CloudFormationProvisionedProduct"
+  Properties:
+   # from aws servicecatalog search-products-as-admin
+   ProductId: !Ref S3ProductId
+   # from aws servicecatalog describe-product-as-admin --id
+   ProvisioningArtifactId: !Ref S3ArtifactId
+   ProvisioningParameters:
+    - Key: "S3BucketName"
+      Value: !Ref S3BucketName
+    - Key: "S3BucketRegion"
+      Value: !Ref S3BucketRegion
+    - Key: "EnableReplicationInProd"
+      Value: !Ref EnableReplicationInProd
+    - Key: "DestinationRegion"
+      Value: !Ref DestinationRegion
+    - Key: "CostCenter"
+      Value: 524154
+    - Key: "EnvironmentType"
+      Value: prd
+    - Key: "ExpirationDate"
+      Value: 99-00-9999
+    - Key: "PPMCId"
+      Value: 69058
+    - Key: "TOC"
+      Value: ETOC
+    - Key: "UsageID"
+      Value: BB00000008
+    - Key: "SDPeriod"
+      Value: na

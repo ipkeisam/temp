@@ -1,0 +1,6 @@
+---
+# this playbook is used to create security groups only - assuming that vpc already exists. 
+- hosts: vpc_dcipenv1
+  roles:
+  - security_groups
+  

@@ -1,0 +1,9 @@
+param (
+    [string]$site,
+    [string]$installer = "{{ cg.working_directory }}\{{ cg.binary }}",
+    [string]$log = "c:\Temp\Splunk\splunkinstall.log"
+)
+
+$splunk_install_file = $installer
+
+& msiexec.exe /qn /Liwem! $log /i $splunk_install_file AGREETOLICENSE=Yes DEPLOYMENT_SERVER="{{ cg.deployment_server}}" INSTALL_SHORTCUT=0 /quiet

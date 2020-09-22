@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Wrapper Template for CFLogGroupsToSplunkMaster
+Parameters:
+  KinesisAccountID:
+     Default: 111417557820
+     Description: AWS Account Number that manages kinesis streams
+     Type: String
+  sourceBucket:
+     Default: organization-repo
+     Description: source bucket for loggroup mapping json file
+     Type: String
+  LoggroupMappingFile:
+     Default: loggroup/loggroup-mapping.json
+     Description: location of json file
+     Type: String
+Resources:
+  CFLogGroupsToSplunkMaster:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        sourceBucket: !Ref sourceBucket
+        KinesisAccountID: !Ref KinesisAccountID
+        LoggroupMappingFile: !Ref LoggroupMappingFile
+      Tags:
+        - Key: cost-center
+          Value: 524154
+        - Key: ppmc-id
+          Value: 69058
+        - Key: usage-id
+          Value: BB00000008
+        - Key: toc 
+          Value: ETOC
+        - Key: exp-date
+          Value: 99-00-9999
+        - Key: env-type
+          Value: prd
+        - Key: sd-period
+          Value: na
+        - Key: category
+          Value: governance                                              
+      TemplateURL: https://organization-repo.s3.amazonaws.com/loggroup/CFLogGroupsToSplunkMaster.yml

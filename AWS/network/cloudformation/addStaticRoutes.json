@@ -1,0 +1,39 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "Template to assign static routes to an existing VPN endpoint. NOTE: The ConnectionId is passed as a parameter from the calling CloudFormation stack. In addition, the static routes being assigned are hardcoded herein.",
+
+  "Metadata": {
+    "Version": "1.0",
+    "LastUpdated": "2017-10-17",
+    "UpdatedBy": "Daren Westman (dwestman@trace3.com)"
+  },
+
+  "Parameters": {
+    "ConnectionId": {
+        "Type": "String",
+        "Description": "Name of the VPN Connection where the static routes are added"
+      },
+    "CidrList" : {
+      "Type" : "CommaDelimitedList",
+      "Description" : "A list of internal CIDR blocks used for routing"
+    }
+  },
+
+  "Resources": {
+      "StaticRoute1": {
+          "Type": "AWS::EC2::VPNConnectionRoute",
+          "Properties": {
+              "DestinationCidrBlock": { "Fn::Select": [ "0", {"Ref": "CidrList"} ] },
+              "VpnConnectionId": { "Ref": "ConnectionId" }
+          }
+      }
+  },
+
+  "Outputs": {
+      "ConnectionId": {
+          "Description": "Reference ID for the VPN connection",
+          "Value": { "Ref": "ConnectionId" }
+      }
+  }
+}

@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy resources (in Master account) for autotagging VPC resources 
+Mappings:
+  RegionMap:
+    us-east-1:
+      sourcebucket: organization-repo
+      s3objectversion: Es7gF_gmMqxc2x_HvExGXKEE5AD5NBsB
+    us-east-2:
+      sourcebucket: organization-repo-e2
+      s3objectversion: 5kLYeKZjjZbvkl3MrYaWc0ShZrv92bPO
+    us-west-1:
+      sourcebucket: organization-repo-w1
+      s3objectversion: r4FOvs8oMwqTsgoUXA1Clkv0MdlDOL_8
+    us-west-2:
+      sourcebucket: organization-repo-w2
+      s3objectversion: OBR2mDIrWTQE7o_Ubu_TI03cfh9GdEXd
+Resources:
+  VPCEventRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Rule created to trigger a lambda function each time a VPC resource is created
+      EventPattern: 
+        source:
+        - aws.ec2
+        detail-type:
+        - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+          - ec2.amazonaws.com
+          eventName:
+          - CreateCustomerGateway
+          - CreateDefaultSubnet
+          - CreateDefaultVpc
+          - CreateDhcpOptions
+          - CreateEgressOnlyInternetGateway
+          - CreateInternetGateway
+          - CreateNatGateway
+          - CreateNetworkAcl
+          - CreateNetworkInterface
+          - CreateNetworkInterfacePermission
+          - CreateRouteTable
+          - CreateSecurityGroup
+          - CreateSubnet
+          - CreateVpc
+          - CreateVpcEndpoint
+          - CreateVpcEndpointConnectionNotification
+          - CreateVpcEndpointServiceConfiguration
+          - CreateVpcPeeringConnection
+          - CreateVpnConnection
+          - CreateVpnGateway
+          - CreateTransitGateway
+          - CreateTransitGatewayMulticastDomain
+          - CreateTransitGatewayPeeringAttachment
+          - CreateTransitGatewayRoute
+          - CreateTransitGatewayRouteTable
+          - CreateTransitGatewayVpcAttachment
+          - CreateTrafficMirrorFilter
+          - CreateTrafficMirrorFilterRule
+          - CreateTrafficMirrorTarget
+          - CreateTrafficMirrorSession
+      EventBusName: tagging
+      Name: AutoTag-VPC-Event
+      State: ENABLED
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt:
+            - LFAutotagVPC
+            - Arn
+          Id: LFAutotagVPCProduction
+  LFAutotagVPCRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Role to create VPC resources
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LFAutotagVPCPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeTags
+                  - ec2:CreateTags
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - organizations:ListTagsForResource
+                Resource: "*"
+              - Sid: AssumeOrgRole
+                Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: 'arn:aws:iam::*:role/OrganizationAccountAccessRole'
+  LFAutotagVPCLG:
+    Type: AWS::Logs::LogGroup
+    DependsOn: LFAutotagVPC
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ''
+          - - /aws/lambda/
+            - Ref: LFAutotagVPC
+      RetentionInDays: 14
+  CWToLFVPCPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      FunctionName:
+        Fn::GetAtt:
+          - LFAutotagVPC
+          - Arn
+      SourceArn:
+        Fn::GetAtt:
+          - VPCEventRule
+          - Arn
+  LFAutotagVPC:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Function to tag VPC resource in response to CloudWatch Events
+      Handler: CFLFAutoTagVPC.lambda_handler
+      Role: 
+        Fn::GetAtt: 
+          - LFAutotagVPCRole
+          - Arn
+      Runtime: python3.7
+      Timeout: '60'
+      Code:
+        S3Bucket:
+          !Sub
+            - '${SourceBucket}'
+            - { SourceBucket: !FindInMap [RegionMap, !Ref 'AWS::Region', sourcebucket]}
+        S3Key: "autotagging/CFLFAutoTagVPC.zip"
+        S3ObjectVersion:
+          !Sub
+            - '${S3ObjectVersion}'
+            - { S3ObjectVersion: !FindInMap [RegionMap, !Ref 'AWS::Region', s3objectversion]}
+Outputs: {}
+      

@@ -1,0 +1,19 @@
+---
+# Playbook to create the vpc, subnets, gateway environment in AWS
+# hosts: points to specific vpc in the inventory
+
+- hosts: 
+  #- vpc_nadatwest1
+  # pass extra variables via playbook command 
+  #           --extra-vars "businessUnit=nad env=prod awsregion=west1"
+  #    OR     -e businessUnit=nad -e env=prod -e awsregion=west1
+  - vpc_{{ businessUnit }}{{ env }}{{ awsregion }}
+  roles:              # for each vpc,  the followings are executed in certain orders
+  - vpc
+  - security_groups
+  - subnets
+  - gateways
+  - route_tables
+
+
+  

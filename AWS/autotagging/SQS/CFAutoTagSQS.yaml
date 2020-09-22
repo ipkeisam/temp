@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy resources (in Master account) for autotagging sqs automation
+Resources:
+  SQSEventRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Rule created to trigger a lambda function each time a Queue is created
+      EventPattern: 
+        source:
+        - aws.sqs
+        detail-type:
+        - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+          - sqs.amazonaws.com
+          eventName:
+          - CreateQueue
+      EventBusName: tagging
+      Name: AutoTag-sqsQueue-Event
+      State: ENABLED
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt:
+            - LFAutotagSQS
+            - Arn
+          Id: LFAutotagsqsProduction
+  LFAutotagSQSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Role to create sqs Queue
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LFAutotagsqsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:TagQueue
+                  - sqs:ListQueues
+                  - sqs:GetQueueUrl
+                  - sqs:UntagQueue
+                  - sqs:ListQueueTags
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - organizations:ListTagsForResource
+                Resource: "*"
+              - Sid: AssumeOrgRole
+                Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: 'arn:aws:iam::*:role/OrganizationAccountAccessRole'
+  LFAutotagsqsLG:
+    Type: AWS::Logs::LogGroup
+    DependsOn: LFAutotagSQS
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ''
+          - - /aws/lambda/
+            - Ref: LFAutotagSQS
+      RetentionInDays: 14
+  CWToLFSQSPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      FunctionName:
+        Fn::GetAtt:
+          - LFAutotagSQS
+          - Arn
+      SourceArn:
+        Fn::GetAtt:
+          - SQSEventRule
+          - Arn
+  LFAutotagSQS:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Function to tag sqs queue in response to CloudWatch Events
+      Handler: index.lambda_handler
+      Role: 
+        Fn::GetAtt: 
+          - LFAutotagSQSRole
+          - Arn
+      Runtime: python3.7
+      Timeout: '60'
+      Code:
+        ZipFile: |
+            from __future__ import print_function
+            import json
+            import os
+            import boto3
+            import logging
+            import time
+            import datetime
+
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
+            
+            def set_sqs_tags(credentials,sqs_id,account_id):
+              old_tags = {}
+              new_tags = {}
+              session = boto3.session.Session()
+              sqs_client=boto3.client(
+                                  service_name='sqs',
+                                  aws_access_key_id=credentials['AccessKeyId'],
+                                  aws_secret_access_key=credentials['SecretAccessKey'],
+                                  aws_session_token=credentials['SessionToken']
+                              )
+              acctags = boto3.client('organizations').list_tags_for_resource(ResourceId=account_id)['Tags']
+              mandatory_tags = {i['Key']: i['Value'] for i in acctags}
+              
+              try:
+                old_tags=sqs_client.list_queue_tags(QueueUrl=sqs_id)['Tags']
+              except Exception as e:
+                print(e)
+              new_tags = {**mandatory_tags, **old_tags}
+              print('Tagging resource ' +  sqs_id)
+    
+              try:
+                response=sqs_client.tag_queue(QueueUrl=sqs_id,Tags=new_tags)
+                print(response)
+                return True
+              except Exception as e:
+                print(e)
+                return False
+
+            def assume_role(account_id, account_role):
+              sts_client = boto3.client('sts')
+              role_arn = 'arn:aws:iam::' + account_id + ':role/' + account_role
+              assuming_role = True
+              while assuming_role is True:
+                  try:
+                      assuming_role = False
+                      assumedRoleObject = sts_client.assume_role(
+                          RoleArn=role_arn,
+                          RoleSessionName="NewAccountRole"
+                      )
+                  except botocore.exceptions.ClientError as e:
+                      assuming_role = True
+                      print(e)
+                      print("Retrying...")
+                      time.sleep(60)
+
+              # From the response that contains the assumed role, get the temporary
+              # credentials that can be used to make subsequent API calls
+              return assumedRoleObject['Credentials']
+        
+
+            def lambda_handler(event, context):
+              try:
+                region=event['detail']['awsRegion']
+                detail=event['detail']
+                account_id = detail['userIdentity']['accountId']
+                eventname=event['detail']['eventName']   
+                logger.info('region: ' + str(region))
+                logger.info('eventName: ' + str(eventname))
+                logger.info('detail: ' + str(detail))
+
+                if not detail['requestParameters']:
+                  logger.warning('No requestParameters found')
+                  if detail['errorCode']:
+                    logger.error('errorCode: ' + detail['errorCode'])
+                  if detail['errorMessage']:
+                    logger.error('errorMessage: ' + detail['errorMessage'])
+                  return False
+                sqsid=" "
+                if account_id == '848721808596':
+                  return False
+       
+                if eventname == 'CreateQueue':
+                    sqsid = detail['responseElements']['queueUrl']
+                    logger.info(sqsid)
+                else:
+                  logger.warning('Not supported action')
+
+                #Assume role of member account before tagging CodeCommit Repository
+                account_role = 'OrganizationAccountAccessRole'
+                credentials = assume_role(account_id, account_role)
+        
+                if sqsid:
+                    response = set_sqs_tags(credentials,sqsid,account_id)
+                    return response
+                else:
+                  return False
+              except Exception as e:
+                logger.error('Error message: ' + str(e))
+                return False
+Outputs: {}

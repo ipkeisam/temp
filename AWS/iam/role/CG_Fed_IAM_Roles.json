@@ -1,0 +1,394 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Capital Group - Creation of IAM roles and policies with added iDP Okta trust permissions. DW-20171120-Rev01",
+"Parameters": {
+      "InfraStackName": {
+          "Description": "Name of this stack.",
+          "Type": "String",
+          "MinLength" : 1,
+          "MaxLength" : 255,
+          "AllowedPattern" : "^[a-zA-Z][-a-zA-Z0-9]*$",
+          "Default" : "CG-Fed-IAM-Roles-Policies-Trust-Stack"
+      }
+},
+"Resources": {
+    "SysAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "SysAdmin",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AdministratorAccess"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "SecurityAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "SecurityAdmin",
+          "ManagedPolicyArns": [{"Ref": "SecurityAdminPolicy"}],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "SecurityAdminPolicy": {
+        "Type" : "AWS::IAM::ManagedPolicy",
+        "Properties" : { 
+          "Description": "Policy defining access for the Security Admin Role",
+          "ManagedPolicyName" : "SecurityAdminPolicy",
+          "PolicyDocument" : {
+                "Fn::Transform" : {
+                    "Name" : "AWS::Include",
+                    "Parameters" : {"Location" : "s3://111417557820-cfn-templates/policies/SecurityAdminPolicy.json"}
+                }
+            }
+        }     
+    },
+    "EncryptionKeyMgmtAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "EncryptionKeyMgmtAdmin",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AWSKeyManagementServicePowerUser"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "SecurityAuditorRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "SecurityAuditor",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/SecurityAudit"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "NetworkAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "NetworkAdmin",
+          "ManagedPolicyArns": [
+                                "arn:aws:iam::aws:policy/job-function/NetworkAdministrator",
+                                "arn:aws:iam::aws:policy/AWSMarketplaceFullAccess",
+                                "arn:aws:iam::aws:policy/AWSSupportAccess",
+                                {"Ref": "CloudFormationAdminPolicy"}
+                            ],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "ComputeAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "ComputeAdmin",
+          "ManagedPolicyArns": [
+                                "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
+                                "arn:aws:iam::aws:policy/AWSSupportAccess",
+                                "arn:aws:iam::aws:policy/AmazonSSMFullAccess",
+                                {"Ref": "CloudFormationAdminPolicy"}
+                            ],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "DBPlatformAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "DBPlatformAdmin",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/job-function/DatabaseAdministrator"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "AppServicePlatformAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "AppServicePlatformAdmin",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "AnalyticsPlatformAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "AnalyticsPlatformAdmin",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "ReaderRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "Reader",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "BillingRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "Billing",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/job-function/Billing"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "AutomationAuthorRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "AutomationAuthor",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "AutomationOperatorRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "AutomationOperator",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "AutomationRuntimeRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "AutomationRuntime",
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess"],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "OZDEVAA00002573RoleDigitalAdminRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "OZDEVAA00002573RoleDigitalAdmin",
+          "ManagedPolicyArns": [
+                                {"Ref": "DigitalOperatorPolicy"},
+                                "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+                                ],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "OZDEVAA00002573RoleDigitalDeveloper": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "OZDEVAA00002573RoleDigitalDeveloper",
+          "ManagedPolicyArns": [
+                                {"Ref": "DigitalOperatorPolicy"},
+                                "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+                                ],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "OZDEVAA00002573RoleDigitalTester": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": "OZDEVAA00002573RoleDigitalTester",
+          "ManagedPolicyArns": [
+                                {"Ref": "DigitalOperatorPolicy"},
+                                "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+                                ],
+          "AssumeRolePolicyDocument": {
+                      "Fn::Transform" : 
+                         {
+                          "Name" : "AWS::Include",
+                           "Parameters" : {"Location" : "s3://111417557820-cfn-templates/roles/Okta_Trust_Relationship_Perms.json"}
+                         }
+                  }
+          }
+    },
+    "DigitalOperatorPolicy": {
+        "Type" : "AWS::IAM::ManagedPolicy",
+        "Properties" : { 
+          "Description": "Policy defining Digital Team Operator Policy",
+          "ManagedPolicyName" : "DigitalOperatorPolicy",
+          "PolicyDocument" : {
+                "Fn::Transform" : {
+                    "Name" : "AWS::Include",
+                    "Parameters" : {"Location" : "s3://111417557820-cfn-templates/policies/DigitalOperatorPolicy.json"}
+                }
+            }
+        }     
+    },
+    "CloudFormationAdminPolicy": {
+        "Type" : "AWS::IAM::ManagedPolicy",
+        "Properties" : { 
+          "Description": "Policy defining cloudFormation Admin Policy",
+          "ManagedPolicyName" : "CloudFormationAdminPolicy",
+          "PolicyDocument" : {
+                "Fn::Transform" : {
+                    "Name" : "AWS::Include",
+                    "Parameters" : {"Location" : "s3://111417557820-cfn-templates/policies/CloudFormationAdminPolicy.json"}
+                }
+            }
+        }     
+    }
+},
+"Outputs": { 
+    "SysAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "SysAdminRole" }
+    },
+    "SecurityAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "SecurityAdminRole" }
+    },
+    "SecurityAdminPolicy": {
+        "Description": "Policy ID",
+        "Value": { "Ref": "SecurityAdminPolicy" }
+    },
+    "EncryptionKeyMgmtAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "EncryptionKeyMgmtAdminRole" }
+    },
+    "SecurityAuditorRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "SecurityAuditorRole" }
+    },
+    "NetworkAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "NetworkAdminRole" }
+    },
+    "ComputeAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "ComputeAdminRole" }
+    },
+    "DBPlatformAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "DBPlatformAdminRole" }
+    },
+    "AppServicePlatformAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "AppServicePlatformAdminRole" }
+    },
+    "AnalyticsPlatformAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "AnalyticsPlatformAdminRole" }
+    },
+    "ReaderRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "ReaderRole" }
+    },
+    "BillingRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "BillingRole" }
+    },
+    "AutomationAuthorRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "AutomationAuthorRole" }
+    },
+    "AutomationOperatorRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "AutomationOperatorRole" }
+    },
+    "AutomationRuntimeRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "AutomationRuntimeRole" }
+    },
+    "OZDEVAA00002573RoleDigitalAdminRole": {
+        "Description": "Role ID",
+        "Value": { "Ref": "OZDEVAA00002573RoleDigitalAdminRole" }
+    },
+    "OZDEVAA00002573RoleDigitalDeveloper": {
+        "Description": "Role ID",
+        "Value": { "Ref": "OZDEVAA00002573RoleDigitalDeveloper" }
+    },
+    "OZDEVAA00002573RoleDigitalTester": {
+        "Description": "Role ID",
+        "Value": { "Ref": "OZDEVAA00002573RoleDigitalTester" }
+    },
+    "DigitalOperatorPolicy": {
+        "Description": "Policy ID",
+        "Value": { "Ref": "DigitalOperatorPolicy" }
+    },
+    "CloudFormationAdminPolicy": {
+        "Description": "Policy ID",
+        "Value": { "Ref": "CloudFormationAdminPolicy" }
+    }
+}
+}

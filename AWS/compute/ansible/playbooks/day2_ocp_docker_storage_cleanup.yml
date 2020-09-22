@@ -1,0 +1,85 @@
+---
+##### 
+# Adhoc docker storage cleanup
+#
+# Instruction:
+#  Cleanups the following items:
+#    1. Exited and dead containers
+#    2. Dangling docker images
+#    3. Non-running docker images
+#  
+#  To run:
+#    1. ansible-playbook -i <inventory file> -e "host_name=<label>" day2_docker_storage_cleanup.yml
+#  
+#  Example: ansible-playbook -i ocp-nadqa-west1.cfg -e "host_name=appnodes[0]" day2_docker_storage_cleanup.yml
+#
+#  Notes:
+#  *  This *should* not interfere with running docker images
+# 
+# extra-vars options 
+#  --------------------------------------------------------------------------------------------------------------------
+#  |  variable name           |       value                 |    require or optional    |     comments
+#  --------------------------------------------------------------------------------------------------------------------
+#  | host_name                | name of host or label       |    require                | nodes[0] or masters, etc.
+#  ---------------------------------------------------------------------------------------------------------------------
+#
+#  LastUpdated: 2018-10-18
+#  UpdatedBy: Cuong Tong ( cuot@capgroup.com )
+#
+
+- hosts: "{{ host_name }}"
+  gather_facts: no
+
+  tasks:
+  - fail:
+      msg: "{{ item }} needs to be defined"
+    when: item not in vars
+    with_items:
+    - host_name
+
+  - name: Ensure docker is running
+    service:
+      name: docker
+      state: started
+      enabled: yes
+
+  - name: Get docker info
+    command: docker info
+    register: docker_info
+
+  - name: Show docker info
+    debug:
+      var: docker_info.stdout_lines
+
+  - name: confirm to continue
+    pause: prompt='Please confirm to continue with deleting exited and/or dead containers! Press return to continue. Press Ctrl+c and then "a" to abort'
+
+  - name: Removing exited containers
+    shell: "docker ps -a | awk '/Exited|Dead/ {print $1}' | xargs --no-run-if-empty docker rm"
+#    shell: "docker rm $(docker ps --filter=status=exited -q)"
+    ignore_errors: yes
+
+  - name: confirm to continue
+    pause: prompt='Please confirm to continue with deleting dangling docker images! Press return to continue. Press Ctrl+c and then "a" to abort'
+
+  - name: Removing dangling docker images
+    shell: "docker images -q -f dangling=true | xargs --no-run-if-empty docker rmi"
+#    shell: "docker rmi $(docker images -f=dangling=true -q)"
+    ignore_errors: yes
+
+  - name: confirm to continue
+    pause: prompt='Please confirm to continue with deleting of non-running docker images! Press return to continue. Press Ctrl+c and then "a" to abort'
+
+  - name: Removing non-running docker images
+    shell: "docker images | grep -v -e docker-registry.default.svc:5000 -e cgregistry.capgroup.com -e cgdevregistry.capgroup.com -e cgtstregistry.capgroup.com -e cgprdregistry.capgroup.com -e registry.access.redhat.com -e docker.io | awk '{print $3}' | xargs --no-run-if-empty docker rmi 2>/dev/null"
+    ignore_errors: yes
+
+  # Get and show docker info again.
+  - name: Get docker info
+    command: docker info
+    register: docker_info
+
+  - name: Show docker info
+    debug:
+      var: docker_info.stdout_lines
+      

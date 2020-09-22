@@ -1,0 +1,110 @@
+---
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+#
+# Playbook for provisioning xpressfeed resources in AWS
+#
+#  LastUpdated: 2018-06-11
+#  UpdatedBy: Cuong Tong ( cuot@capgroup.com )
+#
+  vars:
+    xpressfeed_aws_env_var_file: xpressfeed_prod_us_west_1.yml
+    xpressfeed_aws_create_key_pair: False
+    xpressfeed_aws_create_security_groups: False
+    xpressfeed_aws_provision_app_hosts: True
+    xpressfeed_aws_provision_database_hosts: False
+    xpressfeed_aws_provision_witness_database_hosts: False
+
+  tasks:
+  # create key pair for ssh
+  - name: create key pair
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: create_key_pair.yml
+    vars:
+      aws_ssh_key_name: "{{ xpressfeed_aws_ssh_key_name }}"
+      aws_region: "{{ xpressfeed_aws_region }}"
+    when: xpressfeed_aws_create_key_pair | default(True) | bool
+
+  # create security groups
+  # if security group has circular reference will fail on first run
+  # needs to be re-run
+  - name: create security groups
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: create_aws_security_groups.yml
+    vars:
+      xpressfeed_aws_resource_type: "{{ xpressfeed_aws_env_name }} Security Groups"
+      aws_region: "{{ xpressfeed_aws_region }}"
+      aws_clusterid: "{{ xpressfeed_aws_clusterid }}"
+      aws_resource_tags: "{{ xpressfeed_aws_resource_tags }}"
+      aws_security_groups_dict: "{{ xpressfeed_aws_security_groups }}"
+    when: xpressfeed_aws_create_security_groups | default(True) | bool
+
+  # provision app hosts
+  - name: provision app hosts 1
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: provision_app_instances.yml
+    vars:
+      xpressfeed_aws_resource_type: "{{ xpressfeed_aws_env_name }} App Host"
+      xpressfeed_aws_admin_subnet: '{{ vars["xpressfeed_aws_admin_subnet_1"] }}'
+    when: xpressfeed_aws_provision_app_hosts | default(True) | bool
+
+  - name: provision app hosts 2
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: provision_app_instances.yml
+    vars:
+      xpressfeed_aws_resource_type: "{{ xpressfeed_aws_env_name }} App Host"
+      xpressfeed_aws_admin_subnet: '{{ vars["xpressfeed_aws_admin_subnet_2"] }}'
+    when: xpressfeed_aws_provision_app_hosts | default(True) | bool
+
+  # Provision database hosts
+  - name: provision database hosts 1
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: provision_database_instances.yml
+    vars:
+      xpressfeed_aws_resource_type: "{{ xpressfeed_aws_env_name }} Database Host"
+      xpressfeed_aws_admin_subnet: '{{ vars["xpressfeed_aws_admin_subnet_1"] }}'
+    when: xpressfeed_aws_provision_database_hosts | default(True) | bool
+
+  - name: provision database hosts 2
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: provision_database_instances.yml
+    vars:
+      xpressfeed_aws_resource_type: "{{ xpressfeed_aws_env_name }} Database Host"
+      xpressfeed_aws_admin_subnet: '{{ vars["xpressfeed_aws_admin_subnet_2"] }}'
+    when: xpressfeed_aws_provision_database_hosts | default(True) | bool
+
+  # Provision witness database hosts
+  - name: provision witness database hosts 1
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: provision_database_instances.yml
+    vars:
+      xpressfeed_aws_resource_type: "{{ xpressfeed_aws_env_name }} Witness Database Host"
+      xpressfeed_aws_admin_subnet: '{{ vars["xpressfeed_aws_admin_subnet_1"] }}'
+    when: xpressfeed_aws_provision_witness_database_hosts | default(True) | bool
+
+  - name: provision witness database hosts 2
+    include_role:
+      name: xpressfeed
+      vars_from: "{{ xpressfeed_aws_env_var_file }}"
+      tasks_from: provision_database_instances.yml
+    vars:
+      xpressfeed_aws_resource_type: "{{ xpressfeed_aws_env_name }} Witness Database Host"
+      xpressfeed_aws_admin_subnet: '{{ vars["xpressfeed_aws_admin_subnet_2"] }}'
+    when: xpressfeed_aws_provision_witness_database_hosts | default(True) | bool

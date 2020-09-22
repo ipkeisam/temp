@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create S3 bucket within an existing account
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      sourcebucket: organization-repo
+      s3objectversion: KVlI1MssVEU.nuCvv8Y0Zd6n6Yd655Fg
+    us-east-2: 
+      sourcebucket: organization-repo-e2
+      s3objectversion: BaH66eZCriStl2BUwxnJeVvQAZgic6bv
+    us-west-1: 
+      sourcebucket: organization-repo-w1
+      s3objectversion: gqJkVU5BnWq8CZKAc5FxVZyBQxpVxZ_6
+    us-west-2: 
+      sourcebucket: organization-repo-w2
+      s3objectversion: JCe5J89ncMHPEgPVO8DFWeUXeO9aOOoz
+Parameters:
+  SNSRegion:
+    Default: us-east-1  
+    Type: String
+  SNSTopicARN:
+    Default: arn:aws:sns:us-east-1:848721808596:SNSTopicForSCProductAlerts  
+    Type: String
+Resources:
+  LFCreateS3Bucket:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: ServiceCatalog-LFCreateS3Bucket
+      Description: This function creates S3 bucket within given account/region
+      Environment:
+        Variables:
+          SNS_REGION: !Ref SNSRegion
+          SNS_TOPIC_ARN: !Ref SNSTopicARN
+      Tags:
+        -
+           Key: cost-center
+           Value: 524154
+        -
+           Key: ppmc-id
+           Value: 69058
+        -
+           Key: toc
+           Value: ETOC
+        -
+           Key: usage-id
+           Value: BB00000008
+        -
+           Key: exp-date
+           Value: 99-00-9999
+        -
+           Key: env-type
+           Value: prd
+        -
+           Key: sd-period
+           Value: na
+        -
+           Key: category
+           Value: governance
+      Handler: LFCreateS3Bucket.lambda_handler
+      Role: !GetAtt 
+        - LFCreateS3BucketRole
+        - Arn
+      Runtime: python3.8 
+      Timeout: 60
+      Code:
+        S3Bucket: 
+          !Sub
+            - '${SourceBucket}'
+            - { SourceBucket: !FindInMap [RegionMap, !Ref 'AWS::Region', sourcebucket]}
+        S3Key: "servicecatalog/appl-portfolio/LFCreateS3Bucket.zip"
+        S3ObjectVersion:
+          !Sub
+            - '${S3ObjectVersion}'
+            - { S3ObjectVersion: !FindInMap [RegionMap, !Ref 'AWS::Region', s3objectversion]}
+  LFCreateS3BucketRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Tags:
+        -
+           Key: cost-center
+           Value: 524154
+        -
+           Key: ppmc-id
+           Value: 69058
+        -
+           Key: toc
+           Value: ETOC
+        -
+           Key: usage-id
+           Value: BB00000008
+        -
+           Key: exp-date
+           Value: 99-00-9999
+        -
+           Key: env-type
+           Value: prd
+        -
+           Key: sd-period
+           Value: na
+        -
+           Key: category
+           Value: governance
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFCreateS3BucketPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+              - Effect: Allow
+                Action:
+                  - 'kms:DescribeKey'
+                  - 'kms:ListAliases'
+                  - 'kms:ListKeys'
+                Resource:
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - 's3:CreateBucket'
+                  - 's3:DeleteBucket'
+                  - 's3:PutBucketPublicAccessBlock'
+                  - 's3:GetPublicAccessBlock'
+                  - 's3:DeletePublicAccessBlock'
+                  - 's3:GetBucketPolicyStatus'
+                  - 's3:PutEncryptionConfiguration'
+                  - 's3:GetBucketEncryption'
+                  - 's3:DeleteBucketEncryption'
+                  - 's3:PutBucketLogging'
+                  - 's3:GetBucketLogging'
+                  - 's3:PutBucketTagging'
+                  - 's3:GetBucketTagging'
+                  - 's3:DeleteBucketTagging'
+                  - 's3:PutBucketVersioning'
+                  - 's3:GetBucketVersioning'
+                  - 's3:PutReplicationConfiguration'
+                  - 's3:GetBucketReplication'
+                  - 's3:DeleteBucketReplication'
+                  - 's3:ListObjectsV2'
+                  - 's3:ListObjects'
+                  - 's3:ListAllMyBuckets'
+                  - 's3:HeadBucket'
+                  - 's3:ListBucket'
+                Resource:
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:CreateMultipartUpload'
+                  - 's3:UploadPart'
+                  - 's3:CompleteMultipartUpload'
+                  - 's3:ListParts'
+                  - 's3:ListMultipartUploadParts'
+                  - 's3:AbortMultipartUpload'
+                Resource:
+                  - 'arn:aws:s3:::*/*'
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource:
+                  - !Ref SNSTopicARN
+              - Effect: Allow
+                Action:
+                  - 'iam:GetRole'
+                  - 'iam:PassRole'
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReplicateS3BucketsAllDay'
+  LFCreateS3BucketLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFCreateS3Bucket
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFCreateS3Bucket
+      RetentionInDays: 14

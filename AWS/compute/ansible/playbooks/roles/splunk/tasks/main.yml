@@ -1,0 +1,7 @@
+---
+# tasks file for cg-all-splunk_uf
+- name: include vars based on OS
+  include_vars: "defaults/{{ ansible_os_family }}.yml"
+
+- name: include tasks based on OS
+  include_tasks: "{{ ansible_os_family }}.yml" 

@@ -1,0 +1,302 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "Template to create a VPC using static routing to an existing VPN endpoint. NOTE: The VPNConnection created will define the configuration for the tunnels to the VPN endpoint using the VPN Gateway configuration from the AWS Management console.",
+
+  "Metadata": {
+      "Version": "1.1",
+      "LastUpdated": "2017-11-16",
+      "UpdatedBy": "Jim Lentz (jlentz@trace3.com)"
+  },
+
+  "Parameters": {
+    "VPCCIDR": {
+        "Type": "String",
+        "Description": "IP Address range for the VPN connected VPC",
+        "MinLength": "9",
+        "MaxLength": "18",
+        "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+        "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x.",
+        "Default" : "10.244.128.0/21"
+    },
+
+    "StaticCidrs": {
+      "Type": "CommaDelimitedList",
+      "Description": "A comma-delimited list of static IPs providing CG On Prem internal network access",
+      "Default" : "10.0.0.0/8"
+    },
+    "AdmSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "A comma-delimited list of CIDR blocks for the Admin tier subnets",
+      "Default" : "10.244.134.0/23"
+    },
+    "DMZSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "A comma-delimited list of CIDR blocks for the Web tier subnets",
+      "Default" : "10.244.130.0/23"
+    },
+	"WebVipSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "A comma-delimited list of CIDR blocks for the Web tier subnets",
+      "Default" : "10.244.129.0/23"
+    },
+    "AppSubnets": {
+      "Type": "CommaDelimitedList",
+      "Description": "A comma-delimited list of CIDR blocks for the App tier subnets",
+      "Default" : "10.244.132.0/23"
+    },
+    "Domain": {
+      "Type": "String",
+      "Description": "The domain used for DHCP",
+      "Default" : "us-west-2.compute.internal"
+    },
+
+    "Project" : {
+      "Description" : "Project tag",
+      "Type" : "String",
+      "Default" : "cg-ftdev"
+    },
+    "Env": {
+      "Description" : "Environment tag (nonprod, prod)",
+      "Type" : "String",
+      "Default" : "nonprod"
+    },
+    "Stack": {
+      "Description" : "Stack tag (dev, qa, stg, prd)",
+      "Type" : "String",
+      "Default" : "dev"
+    },
+    "ec2KeyPair": {
+      "Description" : "Amazon EC2 Key Pair",
+      "Type" : "AWS::EC2::KeyPair::KeyName",
+      "Default" : "CG-FTDev-Lab-US-WEST-2"
+    },
+    "TemplateUrl": {
+      "Description" : "S3 bucket from where the CF templates are run",
+      "Type" : "String",
+      "Default" : "https://s3-us-west-2.amazonaws.com/903921672561-cfn-templates/VPC/"
+    },
+	"VPNAddress" : {
+      "Type" : "String",
+      "Description" : "IP Address of your VPN device",
+	  "Default" : "148.107.2.253",
+      "MinLength": "7",
+      "MaxLength": "15",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
+      "ConstraintDescription": "must be a valid IP address of the form x.x.x.x"
+    }
+  },
+
+  "Resources": {
+    "npVPC": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+            "EnableDnsSupport": "true",
+            "EnableDnsHostnames": "true",
+            "CidrBlock": { "Ref": "VPCCIDR" },
+            "Tags": [
+                { "Key": "Name", "Value": { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "vpc", { "Ref" : "Env" } ]] } },
+                { "Key": "Environment", "Value": { "Ref": "Env" } },
+                { "Key": "Network", "Value": "VPN Connected VPC" }
+            ]
+        }
+    },
+    "CustomerGateway" : {
+      "Type" : "AWS::EC2::CustomerGateway",
+      "Properties" : {
+        "Type" : "ipsec.1",
+        "BgpAsn" : "65000", 
+        "IpAddress" : { "Ref" : "VPNAddress" },
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "VPN", "Value" : { "Fn::Join" : ["", ["Gateway to ", {"Ref" : "VPNAddress"}]]}}
+        ]
+      }
+    },
+	"VPNGateway" : {
+      "Type" : "AWS::EC2::VPNGateway",
+      "Properties" : { 
+        "Type" : "ipsec.1",
+        "Tags" : [{ "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" }}]
+      }
+    },
+    "VPNConnection": {
+        "Type": "AWS::EC2::VPNConnection",
+        "Properties": {
+            "Type": "ipsec.1",
+            "StaticRoutesOnly": "true",
+            "CustomerGatewayId": { "Ref": "CustomerGateway" },
+            "VpnGatewayId": { "Ref": "VPNGateway" }
+        }
+    },
+    "VPCGatewayAttachment": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+            "VpcId": { "Ref": "npVPC" },
+            "VpnGatewayId": { "Ref": "VPNGateway" }
+        }
+    },
+    "addStaticRoutes": {
+        "Type": "AWS::CloudFormation::Stack",
+        "DependsOn": "VPNConnection",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addStaticRoutes.json" ]] },
+            "Parameters": {
+                "ConnectionId": { "Ref": "VPNConnection" },
+                "CidrList" : { "Fn::Join" : [ ",", { "Ref": "StaticCidrs" } ] }
+            }
+        }
+    },
+    "addAcl": {
+        "Type": "AWS::CloudFormation::Stack",
+        "DependsOn": "npVPC",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addACLs.json" ]] },
+            "Parameters": {
+                "VPCID": { "Ref": "npVPC" },
+                "Environment" : { "Ref" : "Env" },
+                "Project" : { "Ref" : "Project" },
+                "CidrList" : { "Fn::Join" : [ ",", { "Ref": "StaticCidrs" } ] }
+            }
+        }
+    },
+    "DhcpOptions" : {
+        "Type" : "AWS::EC2::DHCPOptions",
+        "Properties" : {
+            "DomainName" : { "Ref" : "Domain" },
+            "DomainNameServers" : [ "AmazonProvidedDNS" ],
+            "Tags": [
+                { "Key": "Name", "Value" : { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "dhcp-options" ]] } },
+                { "Key": "Environment", "Value": { "Ref": "Env" } }
+            ]
+        }
+    },
+    "DhcpAssociation" : {
+        "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+        "Properties": {
+            "VpcId": { "Ref" : "npVPC" },
+            "DhcpOptionsId": { "Ref" : "DhcpOptions" }
+        }
+    },
+
+    "PrivateRouteTable": {
+        "Type": "AWS::EC2::RouteTable",
+        "DependsOn": "npVPC",
+        "Properties": {
+            "VpcId": { "Ref": "npVPC" },
+            "Tags": [
+                { "Key" : "Environment", "Value" : { "Ref" : "Env" } },
+                { "Key" : "Name", "Value" : { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "rt", "private" ]] } }
+            ]
+        }
+      },
+    "PrivateRoute1": {
+        "Type": "AWS::EC2::Route",
+        "DependsOn": "VPCGatewayAttachment",
+        "Properties": {
+            "RouteTableId": { "Ref": "PrivateRouteTable" },
+            "DestinationCidrBlock": { "Fn::Select": [ "0", {"Ref": "StaticCidrs"} ] },
+            "GatewayId": { "Ref": "VPNGateway" }
+        }
+    },
+
+
+    "InternetGateway": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+            "Tags": [
+                { "Key": "Environment", "Value": { "Ref": "Env" } },
+                { "Key" : "Name", "Value" : { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "igw", "main", "vpc" ]] } }
+            ]
+        }
+    },
+    "IGWAttachment": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "DependsOn": "InternetGateway",
+        "Properties": {
+            "VpcId": { "Ref": "npVPC" },
+            "InternetGatewayId": { "Ref": "InternetGateway" }
+        }
+    },
+
+    "PublicRouteTable": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+            "VpcId": { "Ref": "npVPC" },
+            "Tags": [
+                { "Key": "Environment", "Value": { "Ref": "Env" } },
+                { "Key" : "Name", "Value" : { "Fn::Join" : ["-", [ { "Ref" : "Project" }, "rt", "public" ]] } }
+            ]
+        }
+    },
+    "PublicRoute": {
+        "Type": "AWS::EC2::Route",
+        "DependsOn": "IGWAttachment",
+        "Properties": {
+            "RouteTableId": { "Ref": "PublicRouteTable" },
+            "DestinationCidrBlock": "0.0.0.0/0",
+            "GatewayId": { "Ref": "InternetGateway" }
+        }
+    },
+    "PrivRoute1": {
+        "Type": "AWS::EC2::Route",
+		"DependsOn": "VPNConnection",
+        "Properties": {
+            "RouteTableId": { "Ref": "PublicRouteTable" },
+            "DestinationCidrBlock": { "Fn::Select": [ "0", {"Ref": "StaticCidrs"} ] },
+            "GatewayId": { "Ref": "VPNGateway" }
+        }
+    },
+
+    "addSubnets": {
+        "DependsOn": "addAcl",
+        "Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addSubnets.json" ] ] },
+            "Parameters": {
+                "AdmCidrs": { "Fn::Join" : [ ",", { "Ref" : "AdmSubnets" } ]  },
+                "WebCidrs": { "Fn::Join" : [ ",", { "Ref" : "DMZSubnets" } ]  },
+				"WebVipCidrs": { "Fn::Join" : [ ",", { "Ref" : "WebVipSubnets" } ]  },
+                "AppCidrs": { "Fn::Join" : [ ",", { "Ref" : "AppSubnets" } ]  },
+                "Vpc": { "Ref" : "npVPC" },
+                "PrivateRoute" : { "Ref" : "PrivateRouteTable" },
+                "PublicRoute" : { "Ref" : "PublicRouteTable" },
+                "nwAcl": { "Fn::GetAtt": ["addAcl", "Outputs.NAVL"] },
+                "Project" : { "Ref" : "Project" },
+                "Environment" : { "Ref" : "Env" },
+                "EnvStack" : { "Ref" : "Stack" }
+        }
+      }
+    },
+
+    "addSecGrps" : {
+        "DependsOn" : "addSubnets",
+        "Type": "AWS::CloudFormation::Stack",
+        "Properties": {
+            "TemplateURL": { "Fn::Join" : [ "", [ { "Ref" : "TemplateUrl" }, "addSecGrps.json" ] ] },
+            "Parameters": {
+                "vId" : { "Ref" : "npVPC" },
+                "AdminCidr" : { "Fn::Select": [ "0", {"Ref": "StaticCidrs"} ] },
+                "Environment" : { "Ref" : "Env" },
+                "Project" : { "Ref" : "Project" },
+                "EnvStack" : { "Ref" : "Stack" }
+            }
+        }
+    }
+  },
+
+  "Outputs": {
+    "VPCID": {
+        "Description": "VPC ID of the newly created VPC",
+        "Value": { "Ref": "npVPC" }
+    },
+    "RouteTable": {
+        "Description": "VPC ID of the newly created VPC",
+        "Value": { "Ref": "PrivateRouteTable" }
+    },
+    "ACL": {
+        "Description": "VPC ID of the newly created VPC",
+        "Value": { "Fn::GetAtt": ["addAcl", "Outputs.NAVL"] }
+    }
+  }
+}

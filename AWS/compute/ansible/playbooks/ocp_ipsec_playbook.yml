@@ -1,0 +1,238 @@
+---
+  
+##### 
+# These playbook is for configuring IPSEC on Openshift Cloud Platform
+# It should only meant to run as post install of OCP is completed and on control/bastion host
+#
+# Instruction:
+#   1. Source AWS credentials.   These is require to query VPC and subnets
+#   2. To run:  ansible-playbook -i < inventory cfg file > -e "env_var_file=<env var filename>"  ocp_ipsec_playbook.yml
+# 
+#  LastUpdated: 2018-11-16
+#  UpdatedBy: Cuong Tong ( cuot@capgroup.com )
+#
+
+- hosts: all
+  tasks:
+
+  - fail:
+      msg: "{{ item }} needs to be defined"
+    when: item not in vars
+    with_items:
+    - env_var_file
+
+  #- name: set global variable file to use throughout the playbook
+    #set_fact: 
+      #openshift_aws_env_var_file: <ENV_VAR_FILE> 
+  - name: include env file to work around ansible 2.4 issue
+    include_vars: roles/openshift/vars/{{ env_var_file }}
+
+- hosts: all
+  tasks:
+  - name: "Update the MTU in the node config"
+    lineinfile:
+      path: /etc/origin/node/node-config.yaml
+      line: '   mtu: {{node_sdn_mtu}}'
+      regexp: '^   mtu: [0-9]{1,4}'
+      backup: true
+
+- hosts: nodes
+  tasks:
+  - name: yum install libreswan
+    yum:
+      name: libreswan
+      state: latest
+
+
+- hosts: nodes
+  tasks:
+  - name: stop atomic openshift nodes service
+    shell: systemctl stop atomic-openshift-node
+  
+  # pause for 10 secs before proceeding
+  - name: pause a bit before continuing
+    pause:
+      seconds: 10
+
+  - name: delete OVS bridge
+    shell: ovs-vsctl del-br br0
+
+  # pause for 10 secs before proceeding
+  - name: pause a bit before continuing
+    pause:
+      seconds: 10
+
+  - name: start atomic openshift nodes service
+    shell: systemctl start atomic-openshift-node
+
+  # pause for 10 secs before proceeding
+  - name: pause a bit before continuing
+    pause:
+      seconds: 10
+
+  - name: initialize NSS database 
+    shell: ipsec initnss
+    ignore_errors: yes
+
+  # pause for 10 secs before proceeding
+  - name: pause a bit before continuing
+    pause:
+      seconds: 10
+
+  - name: combine node certs into a PKCS12 file
+    shell: 'openssl pkcs12 -export -in /etc/origin/node/server.crt -inkey /etc/origin/node/server.key -certfile /etc/origin/node/ca.crt -passout pass: -out /tmp/mypkcs'
+  
+  - name: Load the generated PKCS#12 file into the NSS database
+    shell: 'pk12util -i /tmp/mypkcs -d sql:/etc/ipsec.d -W ""'
+
+  - name: delete the generated PKCS12 file
+    file: path='/tmp/mypkcs' state=absent
+
+- hosts: nodes
+  tasks:
+  - name: create openshift cluster config /etc/ipsec.d/openshift-cluster.conf
+    include_role:
+      name: openshift
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_create_copy_cluster_conf.yml
+    when: openshift_create_and_copy_cluster_conf
+
+- hosts: localhost
+  connection: local
+  tasks:
+  - name: include env file to work around ansible 2.4 issue
+    include_vars: roles/openshift/vars/{{ env_var_file }}
+  - name: create private and clear policies 
+    include_role:
+      name: openshift
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_create_policies.yml
+    when: openshift_create_policies
+
+- hosts: nodes
+  tasks:
+  - name: copy private and clear policies to /etc/ipsec.d/ directory
+    include_role:
+      name: openshift
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_copy_policies.yml
+    when: openshift_copy_policies
+
+  - name: configure iptables
+    include_role:
+      name: openshift
+      #vars_from: "{{ openshift_aws_env_var_file }}"
+      tasks_from: ipsec_configure_iptables.yml
+    when: openshift_configure_iptables
+
+- hosts: nodes
+  tasks:
+  - name: prompt for user whether to continue or not
+    pause: prompt='Please confirm you want to start IPSec! Press return to continue. Press Ctrl+c and then "a" to abort'
+
+- hosts: masters[1:2]
+  tasks:
+  - name: stop atomic services on masters 2 and 3
+    shell: 'systemctl stop atomic-openshift-master-controllers.service atomic-openshift-node.service atomic-openshift-master-api.service'
+
+  # pause for 10 secs before proceeding
+  - name: pause for 10 seconds
+    pause:
+      seconds: 10
+
+- hosts: masters
+  tasks:
+  - name: start ipsec on all masters 
+    shell: 'systemctl start ipsec'
+
+  # pause for 10 secs before proceeding
+  - name: pause for 10 seconds
+    pause:
+      seconds: 10
+
+- hosts: masters[1:2]
+  tasks:
+  - name: start atomic services on masters 2 and 3
+    shell: 'systemctl start atomic-openshift-master-api.service atomic-openshift-master-controllers.service atomic-openshift-node.service'
+
+- hosts: nodes
+  tasks:
+  - name: prompt for user whether to continue or not
+    pause: prompt='Please confirm if you want to continue with the first master!. Press Ctrl+c and then "a" to abort' 
+- hosts: masters[0]
+  tasks:
+  - name: stop atomic services on masters 1
+    shell: 'systemctl stop atomic-openshift-master-controllers.service atomic-openshift-node.service atomic-openshift-master-api.service'
+
+  # pause for 10 secs before proceeding
+  - name: pause for 10 seconds
+    pause:
+      seconds: 10
+
+- hosts: masters[0]
+  tasks:
+  - name: start atomic services on masters 1
+    shell: 'systemctl start atomic-openshift-master-api.service atomic-openshift-master-controllers.service atomic-openshift-node.service'
+
+- hosts: nodes
+  tasks:
+  - name: prompt for user whether to continue or not
+    pause: prompt='Please confirm if you want to continue with the infra!. Press Ctrl+c and then "a" to abort'  
+- hosts: infra
+  tasks:
+  - name: start ipsec on all infra
+    shell: 'systemctl start ipsec' 
+
+  # pause for 10 secs before proceeding
+  - name: pause for 10 seconds
+    pause:
+      seconds: 10
+
+- hosts: infra
+  tasks:
+  - name: restart atomic service on all infra 
+    shell: 'systemctl restart atomic-openshift-node.service'  
+- hosts: nodes
+  tasks:
+  - name: prompt for user whether to continue or not
+    pause: prompt='Please confirm if you want to continue with the app!. Press Ctrl+c and then "a" to abort'  
+
+- hosts: appnodes
+  tasks:
+  - name: start ipsec on all app nodes
+    shell: 'systemctl start ipsec'
+
+  # pause for 10 secs before proceeding
+  - name: pause for 10 seconds
+    pause:
+      seconds: 10
+
+- hosts: appnodes
+  tasks:
+  - name: restart atomic service on all app nodes
+    shell: 'systemctl restart atomic-openshift-node.service'
+
+  # pause for 10 secs before proceeding
+  - name: pause for 10 seconds
+    pause:
+      seconds: 10
+
+- hosts: masters[0]
+  tasks:
+  - name: verify cluster is communicating properly
+    shell: 'oc get nodes'  
+
+- hosts: masters[0]
+  tasks:
+  - name: verify cluster is communicating properly
+    shell: 'oc get pods --all-namespaces'  
+
+- hosts: nodes
+  tasks:
+  - name: prompt for user whether to continue or not
+    pause: prompt='Please confirm you want to enable IPSec! Press return to continue. Press Ctrl+c and then "a" to abort'
+
+  - name: enable IPSec
+    shell: 'systemctl enable ipsec'  
+
+

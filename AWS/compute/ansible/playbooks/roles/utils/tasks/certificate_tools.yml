@@ -1,0 +1,39 @@
+---
+
+- name: create directory to store certificates
+  file:
+    path: "{{ cert_common_name }}"
+    state: directory
+
+# these block of task requires python-pyOpenSSL >= 0.15 to be installed 
+- block: 
+    - name: generate a private key using pyOpenSSL
+      openssl_privatekey:
+        path: "{{ cert_common_name }}/privkey.pem"
+        size: "{{ cert_rsa_key_size }}"
+        cipher: aes256
+        passphrase: ""
+    - name: generate a CSR using pyOpenSSL
+      openssl_csr:
+        path: "{{ cert_common_name }}.csr"
+        privatekey_path: "{{ cert_common_name }}/privkey.pem"
+        digest: sha256
+        common_name: "{{ cert_common_name }}"
+        organization_name: The Capital Group Companies Inc
+        organizational_unit_name: Information Technology
+        locality_name: San Antonio
+        state_or_province_name: Texas
+        country_name: US
+    - name: generate a self signed certificate using pyOpenSSL
+      openssl_certificate:
+        path: "{{ cert_common_name}}/{{ cert_common_name }}.crt"
+        privatekey_path: "{{ cert_common_name}}/privkey.pem"
+        csr_path: "{{ cert_common_name }}.csr"
+        provider: selfsigned
+  when: cert_pyopenssl_available | default(True)  
+
+- name: generate private key and CSR using openssl
+  command: "openssl req -nodes -newkey rsa:{{ cert_rsa_key_size }} -keyout '{{ cert_common_name }}/privkey.pem' -out {{ cert_common_name}}/{{ cert_common_name }}.crt -subj '/C=US/ST=Texas/L=San Antonio/O=The Capital Group Companies Inc/OU=Information Technology/CN={{ cert_common_name }}'"
+  when: not cert_pyopenssl_available 
+
+

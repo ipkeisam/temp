@@ -1,0 +1,98 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "Capital Group - Creation of IAM roles and policies for Guard Duty",
+	"Resources": {
+		"CloudWatchInlinePolicy": {
+			"Type": "AWS::IAM::ManagedPolicy",
+			"Properties": {
+				"Description": "Policy for cloudwatch logs",
+				"ManagedPolicyName": "CloudWatchInlinePolicy",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Action": [
+								"logs:CreateLogGroup",
+								"logs:CreateLogStream",
+								"logs:PutLogEvents"
+							],
+							"Resource": "arn:aws:logs:*:*:*",
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"sts:AssumeRole"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						}
+
+					]
+				}
+			}
+		},
+		"MasterAccountEnableGuardDuty": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"RoleName": "MasterAccountEnableGuardDuty",
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Action": "sts:AssumeRole",
+						"Principal": {
+							"Service": [
+								"ec2.amazonaws.com",
+								"lambda.amazonaws.com"
+							]
+						}
+					}]
+				},
+				"ManagedPolicyArns": [{
+						"Ref": "CloudWatchInlinePolicy"
+					},
+					"arn:aws:iam::aws:policy/AmazonGuardDutyFullAccess",
+					"arn:aws:iam::aws:policy/AWSOrganizationsFullAccess"
+				],
+				"Tags": [
+                    {
+                        "Key": "cost-center",
+                        "Value": 524154
+                    },
+                    {
+                        "Key": "ppmc-id",
+                        "Value": 69058
+                    },
+                    {
+                        "Key": "usage-id",
+                        "Value": "BB00000008"
+                    },
+                    {
+                        "Key": "toc",
+                        "Value": "ETOC"
+                    },
+                    {
+                        "Key": "exp-date",
+                        "Value": "99-00-9999"
+                    },
+                    {
+                        "Key": "env-type",
+                        "Value": "dev"
+                    },
+                    {
+                        "Key": "sd-period",
+                        "Value": "na"
+                    }
+                ]
+			}
+		}
+	},
+	"Outputs": {
+		"MasterAccGuardDutyRole": {
+			"Description": "Role ID",
+			"Value": {
+				"Ref": "MasterAccountEnableGuardDuty"
+			}
+		}
+	}
+}

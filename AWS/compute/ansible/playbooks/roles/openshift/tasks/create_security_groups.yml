@@ -1,0 +1,30 @@
+---
+
+- name: Fetch the VPC for the vpc.id
+  ec2_vpc_net_facts:
+    region: "{{ openshift_aws_region }}"
+    filters:
+      "tag:Name": "{{ openshift_aws_clusterid }}"
+  register: vpcout
+
+- debug:
+    #Use this for ansible 2.6
+    msg: "{{ vpcout.vpcs[0].vpc_id }}"
+    #Use this for ansible 2.4
+    #msg: "{{ vpcout.vpcs[0].id }}"
+
+- name: create OCP security groups
+  ec2_group:
+    name: "{{ item.value.name}}"
+    description: "{{ item.value.desc }}"
+    rules: "{{ item.value.rules if 'rules' in item.value else [] }}"
+    region: "{{ openshift_aws_region }}"
+    #Use this below for ansible 2.6
+    vpc_id: "{{ vpcout.vpcs[0].vpc_id }}"
+    #Use this below for ansible 2.4
+    #vpc_id: "{{ vpcout.vpcs[0].id }}"
+    rules_egress: "{{ item.value.rules_egress if 'rules_egress' in item.value else [] }}"
+    tags: "{{ openshift_aws_resource_tags }}"
+  with_dict: "{{ openshift_aws_node_security_groups }}"
+
+

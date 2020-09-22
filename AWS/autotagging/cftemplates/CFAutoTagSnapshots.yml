@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Auto Tag EBS Snapshots'
+Resources:
+  EBSSnapshotEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: >-
+        Trigger a Lambda function anytime a new EBS snapshot is taken
+      EventPattern:
+        source: 
+          - aws.ec2
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - ec2.amazonaws.com
+          eventName:
+            - CreateSnapshot
+      Name: New-EBSSnapshotResource-Event
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LFEBSSnapshotAutoTag"
+              - "Arn"
+          Id: "LFEBSSnapshotAutoTagProd"
+  LFEBSSnapshotAutoTag:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Description: This function tags EBS snapshots in response to Cloudwatch Events. 
+      Handler: index.lambda_handler 
+      Role: !GetAtt 
+        - EBSSnapshotAutoTagRole
+        - Arn
+      Runtime: python3.7 
+      Timeout: '60'
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import json
+          import os
+          import boto3
+          import logging
+          import time
+          import datetime
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+
+              snapshotid = []              
+              try:
+                  region = event['region']
+                  detail = event['detail']
+                  logger.info('detail: ' + str(detail))     
+                  sourceVolumeID = detail['responseElements']['volumeId']
+
+                  logger.info('region: ' + str(region))
+                  logger.info('sourceVolumeID: ' + str(sourceVolumeID))
+
+                  client = boto3.client('ec2')
+
+                  response = client.describe_volumes(
+                      VolumeIds=[
+                          sourceVolumeID,
+                      ]
+                  )
+
+                  volumeTagDetails = response['Volumes'][0]['Tags']
+                  logger.info(volumeTagDetails)
+                  
+                  snapshotid.append(detail['responseElements']['snapshotId'])
+                  logger.info(snapshotid)
+
+                  if snapshotid:
+                      for resourceid in snapshotid:
+                          print('Tagging resource ' + resourceid)
+                      client.create_tags(Resources=snapshotid, Tags=volumeTagDetails)
+
+                  return True
+              except Exception as e:
+                  logger.error('Something went wrong: ' + str(e))
+                  return False
+  LFEBSSnapshotAutoTagLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFEBSSnapshotAutoTag
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFEBSSnapshotAutoTag
+      RetentionInDays: 14
+  PermissionForEC2EventsToInvokeLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: 
+        Ref: LFEBSSnapshotAutoTag
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: 
+          - EBSSnapshotEventRule
+          - Arn
+  EBSSnapshotAutoTagRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: EBSSnapshotAutoTagPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923097000
+                Effect: Allow
+                Action:
+                  - 'cloudtrail:LookupEvents'
+                Resource:
+                  - '*'
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - 'ec2:CreateTags'
+                  - 'ec2:Describe*'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - '*'
+Outputs: {}

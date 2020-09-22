@@ -1,0 +1,28 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": [ 
+            "arn:aws:iam::111417557820:saml-provider/Okta",
+            "arn:aws:iam::111417557820:saml-provider/OktaProd",
+            "arn:aws:iam::410997643304:saml-provider/Okta",
+            "arn:aws:iam::410997643304:saml-provider/OktaProd",
+            "arn:aws:iam::848721808596:saml-provider/Okta",
+            "arn:aws:iam::848721808596:saml-provider/OktaProd",
+            "arn:aws:iam::893373391538:saml-provider/Okta",
+            "arn:aws:iam::893373391538:saml-provider/OktaProd",
+            "arn:aws:iam::903921672561:saml-provider/Okta",
+            "arn:aws:iam::903921672561:saml-provider/OktaProd"
+        ]
+      },
+      "Action": "sts:AssumeRoleWithSAML",
+      "Condition": {
+        "StringEquals": {
+          "SAML:aud": "https://signin.aws.amazon.com/saml"
+        }
+      }
+    }
+  ]
+}

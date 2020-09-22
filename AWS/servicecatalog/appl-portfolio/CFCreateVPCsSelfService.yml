@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: VPC Creation Template.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Parameters for creation of VPC within an AWS account
+        Parameters:
+          - vpcregion
+
+Parameters:
+
+  VPCRegion:
+    Description: "Region where VPC will be provisioned"
+    Default : "us-east-1"
+    Type: String
+    AllowedValues:
+      - us-east-1
+      - us-west-1
+      - us-west-2
+
+  NumberOfSubnets:
+    Description: "Number of subnets required within the VPC, us-west-1 only 2 subnets allowed"
+    Default : "2"
+    Type: String
+    AllowedValues:
+      - 2
+      - 3
+
+Resources:
+  TriggerSNS:
+    Type: "Custom::TriggerSNS"
+    Properties:
+      ServiceToken: arn:aws:sns:us-east-1:848721808596:ServiceCatalogVPCCreateTopic
+      account_id: !Ref AWS::AccountId
+      vpc_region: !Ref VPCRegion
+      number_of_subnets: !Ref NumberOfSubnets

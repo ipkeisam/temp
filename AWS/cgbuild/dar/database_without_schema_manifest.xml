@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<udm.DeploymentPackage version="<%CG_BUILD_PKG_ID%>" application="Development/<%CG_PROJECT_KEY%>/<%CG_APP_NAME%>">
+  <orchestrator />
+  <application />
+  <deployables>
+    <flyway.Scripts name="SQL-Files">
+      <tags />
+      <scanPlaceholders>true</scanPlaceholders>
+      <fileUri>checksum-http://<%CG_XLD_PKG_REPO%>:8080/bbnas/bb<%CG_BUILD_TYPE%>/<%CG_PROJECT_KEY%>/<%CG_PLAN_NAME%>/<%CG_BUILD_NUMBER%>/dist/package/<%CG_BUILD_PKG_ID%>.zip</fileUri>
+      <locations>{{SQL_LOCATIONS}}</locations>
+      <baselineOnMigrate>false</baselineOnMigrate>
+      <repair>true</repair>
+      <outOfOrder>false</outOfOrder>
+      <validateOnMigrate>true</validateOnMigrate>
+      <atmID><%CG_ATM_ID%></atmID>
+    </flyway.Scripts>
+  </deployables>
+  <applicationDependencies />
+</udm.DeploymentPackage>

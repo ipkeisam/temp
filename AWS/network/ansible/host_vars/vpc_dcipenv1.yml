@@ -1,0 +1,181 @@
+---
+#Region for vpc_dcipenv1-west
+aws_region: "us-west-1"
+
+# vpc info - Pre prod
+vpc_name: "vpc1_dcip"
+vpc_cidr: "10.244.158.0/24"
+account_name: "dcip_env"       # use AWS account name w/o the AWS in lower case
+
+# Tags values:
+#   vpc tag values
+resource_usage_id: "network"
+atm_id: "AA00002721"
+p_id: "80052"
+cost_center: "524051"
+env_type: "dcip-env1-UAT"
+
+
+#   subnet tag values
+subnet_atm_id: "AA00002721"
+subnet_p_id: "80052"
+subnet_cost_center: "524051"
+subnet_env_type: "dcip-env1"
+subnet_usage_id: "network-private"    #use "network-public" for public subnet
+
+#AZ-Subnets
+#this section describes all the subnets and set up index and sname(shortname) to form the subnet name later. 
+#changing the field value without "{{value}}" will not require changing script
+#adding more keys will require changing the script
+
+vpc_private_subnets:
+  private_1:
+    az_name:  "{{aws_region}}a"
+    cblk:     "10.244.158.0/26"
+    cnt:      "1"
+    sname:    "app"
+  private_2:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.244.158.64/26"
+    cnt:      "2"
+    sname:    "app"
+  private_3:
+    az_name:  "{{aws_region}}a"
+    cblk:     "10.244.158.128/26"
+    cnt:      "3"
+    sname:    "vip"
+  private_4:
+    az_name:  "{{aws_region}}b"
+    cblk:     "10.244.158.192/26"
+    cnt:      "4"
+    sname:    "vip"
+
+vpc_public_subnets: 
+  public_1: ""      #in this case there are no public subnet.  Otherwise use the same format as above to specify subnets
+
+# Security groups - standards for any vpc. Any other security groups needed at a later date can be added here using the same format.
+vpc_security_groups:
+  - name: Allow-SSH-RDP-NTP-DNS-from-CG-userland
+    description:  "Allow SSH, NTP,RDP,DNS  to and from CG userland"   # shouldn't this be adminE
+    rules:
+      - proto:  "tcp"
+        cidr_ip:   10.0.0.0/8    #this need to narrow down to userland subnets
+        ports:
+          - 22
+          - 3389
+      - proto: "tcp"            #Allow access to DB servers on 10.244.158 subnet
+        cidr_ip:  10.244.158.0/24
+        ports:
+          - 1590
+      - proto: "icmp"
+        cidr_ip:  10.0.0.0/8
+        from_port:  8
+        to_port:    0
+    rules_egress: 
+      - proto:  "udp"
+        cidr_ip: 
+          - "10.32.2.245/32"
+          - "10.92.6.136/32"
+          - "10.16.5.186/32"
+        ports:
+          - 123
+      - proto:  "udp"
+        cidr_ip:
+          - 10.0.0.11/32
+          - 10.0.0.12/32
+        ports:
+          - 53
+      - proto:  "tcp"
+        cidr_ip:
+          - 10.0.0.11/32
+          - 10.0.0.12/32
+        ports:
+          - 53
+      - proto:  "icmp"
+        cidr_ip:
+          - 10.0.0.0/8
+        from_port:  8
+        to_port:    0
+  - name: SLM-access-from-CGProd
+    description:  "Allow SSH, WinRM, SMB from CG SLM"
+    rules:
+      - proto:  "tcp"
+        cidr_ip: 
+          - "10.92.114.82/32"
+          - "10.18.120.50/32"
+        ports:
+          - 22
+          - 5986
+          - 445
+    rules_egress: ""
+  - name:  Allow-web-traffic-from-to-CG
+    description:  "Allow web traffic from/to CG"
+    rules:
+      - proto: "tcp"
+        cidr_ip:  "10.0.0.0/8"    #need to narrow down to what server zones from CG
+        ports:
+          - 80
+          - 8080
+          - 443
+    rules_egress:
+      - proto: "tcp"
+        cidr_ip:  "0.0.0.0/0"   #need to narrow down to what server zones
+        ports:
+          - 443
+      - proto: "tcp"
+        cidr_ip:  "10.0.0.0/8"
+        ports:
+          - 80
+  - name: Allow-SQL-Management-From CG
+    description:  "Allow SQL Management from CG"
+    rules:
+      - proto: "tcp"
+        cidr_ip:  "10.0.0.0/8"  #need to narrow this to Admin E or userland
+        ports:
+          - 1590
+          - 1434
+    rules_egress: ""
+  - name: Allow-Ping-on-10-subnets
+    description:  "Allow ping on 10.0.0.0"
+    rules:
+      - proto: "tcp"
+        cidr_ip:  "10.0.0.0/8"  #need to narrow this to Admin E or userland
+        ports:
+          - 1590
+          - 1434
+    rules_egress: ""
+# DHCP Option sets:
+dhcp_options_set:
+  - dnsname:  "cguser.capgroup.com"
+    dns_servers:
+      - 10.0.0.11
+      - 10.0.0.12
+
+    ntp_servers:
+      - 10.30.2.245
+      - 10.92.6.136
+      - 10.16.5.186
+
+#Gateways options:
+public_facing: "false"      # Does this VPC allow Internet facing traffic and contain public subnet
+direct_connect: "true"      # Does this VPC connect to CG via DirectConnect 
+VPN_connect:    "false"     # This should be false if using direct connect instead
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
+
+
+

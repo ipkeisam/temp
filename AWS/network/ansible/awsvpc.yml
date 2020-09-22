@@ -1,0 +1,12 @@
+---
+# Playbook to create the vpc, subnets, gateway environment in AWS
+# hosts: points to specific vpc in the inventory
+
+- hosts:     # Should do this one vpc at the time - Paramters for each vpc will be in host_vars/<vpcname>.yml
+  - vpc_dcipenv1
+  roles:              # for each vpc,  the followings are executed in certain orders
+  - vpc
+  - security_groups
+  - subnets
+  - gateways
+  - route_tables

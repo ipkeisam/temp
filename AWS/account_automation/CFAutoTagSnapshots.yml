@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Enabling Autotag Snapshots for a new account
+Parameters:
+  sourceBucket:
+    Default: na  
+    Type: String
+  baselineAutoTagSnapshotStack:
+    Default: na
+    Type: String
+  baselineAutoTagSnapshotRegion:
+    Default: na
+    Type: String
+Resources:
+  LFAutoTagSnapshots:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment:
+        Variables:
+          BaselineStack: !Ref baselineAutoTagSnapshotStack
+          BaselineRegion: !Ref baselineAutoTagSnapshotRegion
+      Description: This function deploys baseline auto tag snapshots for a new account. 
+      Handler: LFNewAccountAutoTagSnapshots.lambda_handler
+      Role: !GetAtt 
+        - LFAutoTagSnapshotsRole
+        - Arn
+      Runtime: python3.8 
+      Timeout: 60
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "acctautomation/LFNewAccountAutoTagSnapshots.zip"
+  LFAutoTagSnapshotsLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFAutoTagSnapshots
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFAutoTagSnapshots
+      RetentionInDays: 14
+  LFAutoTagSnapshotsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: AccountVending-LFAutoTagSnapshotsRole
+      Path: /service-role/
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LFAutoTagSnapshotsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AWSCloudFormationFullAccess'
+      - 'arn:aws:iam::848721808596:policy/StackSetExecutionPolicy'
+
+Outputs:
+  LFAutoTagSnapshotsArn:
+    Value: !GetAtt LFAutoTagSnapshots.Arn

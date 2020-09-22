@@ -1,0 +1,10 @@
+---
+- name: Create users
+  hosts: localhost
+  tasks:
+    - name: Include vars
+      include_vars:
+        dir: vars
+    
+    - debug:
+        msg: Offline token is {{ offline_token }}

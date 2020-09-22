@@ -1,0 +1,197 @@
+---
+dcip_aws_atm_id: AA00002721
+dcip_aws_ppmc_id: "80052"
+
+dcip_aws_database_ec2_user_acct: [ 'computeadmin1', 'computeadmin2', 'sqladmin1', 'sqladmin2' ]
+dcip_aws_app_ec2_system_acct: [ 'cyark_rc', 'x_vmast' ]
+dcip_aws_app_ec2_user_acct: [ 'computeadmin1', 'computeadmin2', 'dcipadmin1', 'dcipadmin2' ]
+dcip_aws_service_now_acct: [ 'aws_svcnow_unix_local_svc' ]
+
+# default instance type to use
+dcip_aws_ec2_db_instance_type: m5.xlarge
+dcip_aws_ec2_app_instance_type: m5.large
+
+# set by copy_ami.yml
+dcip_aws_ami_copy_custom_ami: ''
+
+dcip_aws_wait_for_ssh: True
+
+# termination protection
+dcip_aws_ec2_termination_protection: yes
+
+dcip_aws_ec2_db_user_data: |
+          <powershell>
+          Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Force
+          Initialize-Disk -Number 1 -PartitionStyle "MBR"
+          $part = New-Partition -DiskNumber 1 -UseMaximumSize -IsActive -DriveLetter G
+          Format-Volume -DriveLetter $part.DriveLetter -Confirm:$FALSE
+          Initialize-Disk -Number 2 -PartitionStyle "MBR"
+          $part = New-Partition -DiskNumber 2 -UseMaximumSize -IsActive -DriveLetter E
+          Format-Volume -DriveLetter $part.DriveLetter -Confirm:$FALSE
+          Initialize-Disk -Number 3 -PartitionStyle "MBR"
+          $part = New-Partition -DiskNumber 3 -UseMaximumSize -IsActive -DriveLetter J
+          Format-Volume -DriveLetter $part.DriveLetter -Confirm:$FALSE
+          Initialize-Disk -Number 4 -PartitionStyle "MBR"
+          $part = New-Partition -DiskNumber 4 -UseMaximumSize -IsActive -DriveLetter I
+          Format-Volume -DriveLetter $part.DriveLetter -Confirm:$FALSE
+          Initialize-Disk -Number 5 -PartitionStyle "MBR"
+          $part = New-Partition -DiskNumber 5 -UseMaximumSize -IsActive -DriveLetter H
+          Format-Volume -DriveLetter $part.DriveLetter -Confirm:$FALSE
+          Initialize-Disk -Number 6 -PartitionStyle "MBR"
+          $part = New-Partition -DiskNumber 6 -UseMaximumSize -IsActive -DriveLetter Q
+          Format-Volume -DriveLetter $part.DriveLetter -Confirm:$FALSE
+          Initialize-Disk -Number 7 -PartitionStyle "MBR"
+          $part = New-Partition -DiskNumber 7 -UseMaximumSize -IsActive -DriveLetter Z          
+          Format-Volume -DriveLetter $part.DriveLetter -Confirm:$FALSE
+          New-LocalUser -Name "sqladmin1" -Description "SQL Admin account." -NoPassword
+          Add-LocalGroupMember -Group "Administrators" -Member "sqladmin1"
+          New-LocalUser -Name "sqladmin2" -Description "SQL Admin account." -NoPassword
+          Add-LocalGroupMember -Group "Administrators" -Member "sqladmin2"
+          New-LocalUser -Name "computeadmin1" -Description "Compute Admin account." -NoPassword
+          Add-LocalGroupMember -Group "Administrators" -Member "computeadmin1"
+          New-LocalUser -Name "computeadmin2" -Description "Compute Admin account." -NoPassword
+          Add-LocalGroupMember -Group "Administrators" -Member "computeadmin2"
+          New-LocalUser -Name "cyark_rc" -Description "CyberArk account." -NoPassword
+          Add-LocalGroupMember -Group "Administrators" -Member "cyark_rc"
+      	  New-LocalUser -Name "x_vmast" -Description "Qualys account." -NoPassword
+          Add-LocalGroupMember -Group "Administrators" -Member "x_vmast"
+          </powershell>
+
+dcip_aws_ec2_app_user_data: |
+          #!/bin/bash
+          #
+          # update sshd_config to allow password auth
+          sed -i 's/^ssh_pwauth:.*/ssh_pwauth:   1/' /etc/cloud/cloud.cfg
+          sed -i 's/^PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          # only allow strong ciphers for ssh
+          sed -i '/#   Protocol 2/a Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour\nMACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160' /etc/ssh/ssh_config
+          sed -i '/#RekeyLimit default none/a Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour\nMACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160' /etc/ssh/sshd_config
+          # restart sshd daemon
+          service sshd restart
+          # update locatime to PST
+          rm -f /etc/localtime
+          ln -s /usr/share/zoneinfo/US/Pacific /etc/localtime
+          # Make sure EBS volumes have been created AND attached to this instance !
+          # Wait for volume to be available
+          while [ ! -e /dev/nvme1n1 ] ; do echo waiting for /dev/nvme1n1 to attach; sleep 10 ; done
+          # Format /dev/nvme1n1 if it does not contain a partition yet
+          if file -b -s /dev/nvme1n1 == "data" ; then
+            mkfs.ext4 -E nodiscard /dev/nvme1n1
+          fi
+          # Persist the volume in /etc/fstab so it gets mounted again
+          echo '/dev/nvme1n1       /users/data                 ext4    defaults,nofail 0       2' >> /etc/fstab
+          # create /users/data mount point and mount volume
+          mkdir -p /users/data
+          mount -a
+
+dcip_aws_app_instance_data_volume:
+  data:
+    device_name: /dev/sdb
+    volume_size: 20
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"
+
+dcip_aws_db_instance_data_volume:
+  e_drive:
+    device_name: /dev/sdb
+    volume_size: 50
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"
+  g_drive:
+    device_name: /dev/sdc
+    volume_size: 100
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"
+  h_drive:
+    device_name: /dev/sdd
+    volume_size: 100
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"
+  i_drive:
+    device_name: /dev/sde
+    volume_size: 50
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"
+  j_drive:
+    device_name: /dev/sdf
+    volume_size: 30
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"
+  z_drive:
+    device_name: /dev/sdg
+    volume_size: 50
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"
+
+dcip_aws_db_witness_instance_data_volume:
+  q_drive:
+    device_name: /dev/sdh
+    volume_size: 50
+    volume_type: gp2
+    encrypted: True
+    delete_on_termination: True
+    kms_key_id: "{{ dcip_aws_volume_kms_key_id }}"  
+
+# build the security groups dict
+dcip_aws_security_groups:
+  app:
+    name: "{{ dcip_aws_env_name }}_dcip_app_sg"
+    desc: "{{ dcip_aws_env_name }} DCIP App SG"
+    rules:
+    - proto: tcp
+      from_port: 22
+      to_port: 22
+      cidr_ip: 0.0.0.0/0
+    - proto: tcp
+      from_port: 1433
+      to_port: 1433
+      cidr_ip: 10.0.0.0/8
+    - proto: tcp
+      from_port: 443
+      to_port: 443
+      cidr_ip: 0.0.0.0/0
+    rules_egress:
+    - proto: all
+      from_port: 0
+      to_port: 65535
+      cidr_ip: 0.0.0.0/0
+  database:
+    name: "{{ dcip_aws_env_name }}_dcip_db_sg"
+    desc: "{{ dcip_aws_env_name }} DCIP DB SG"
+    rules:
+    - proto: tcp
+      from_port: 1590
+      to_port: 1590
+      cidr_ip: 10.0.0.0/8
+    - proto: tcp
+      from_port: 1434
+      to_port: 1434
+      cidr_ip: 10.0.0.0/8
+
+# default dcip resource tagging
+dcip_aws_resource_tags:
+  Name: "{{ dcip_aws_resource_type }}"
+  usage-id: "{{ dcip_aws_atm_id }}"
+  cost-center: ""
+  sec-profile: normal
+  exp-date: 99-00-9999
+  sd-period: na
+  p-id: "{{ dcip_aws_ppmc_id }}"
+  env-type: "{{ dcip_aws_env_type }}"
+  cloud-dependency: cloudonly
+  app-type: "{{ dcip_aws_resource_type }}"
+  site: aws

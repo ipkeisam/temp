@@ -1,0 +1,133 @@
+---
+#####
+#
+# Playbook to backup Openshift Container Platform projects and add job to cron
+# 
+# Instruction:  
+#    To run:
+#      1. Run playbook: ansible-playbook -e "master_hostname=<master hostname>" /home/ozinfbb00000085s002/cloud_automation/AWS/compute/ansible/playbooks/day2_ocp_project_backup.yml 
+#
+# Example:  ansible-playbook -e "master_hostname=ip-10-244-152-213.us-west-1.compute.internal" /home/ozinfbb00000085s002/cloud_automation/AWS/compute/ansible/playbooks/day2_ocp_project_backup.yml 
+# 
+# extra-vars options 
+#  --------------------------------------------------------------------------------------------------------------------
+#  |  variable name           |       value                 |    require or optional    |     comments
+#  --------------------------------------------------------------------------------------------------------------------
+#  | master_hostname          | AWS private dns name        |    require                | ip-10-244-152-213.us-west-1.compute.internal
+#  ---------------------------------------------------------------------------------------------------------------------
+#
+#  LastUpdated: 2019-01-10
+#  UpdatedBy: Cuong Tong ( cuot@capgroup.com )
+#
+
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+
+  vars:
+   # define env specific var
+   o_user: ozinfbb00000085s002
+   env: dev
+   # define cron schedule
+   cron_weekday: "0-6"
+   cron_hour: 20
+   cron_minute: 0
+
+  tasks:
+  - fail:
+      msg: "{{ item }} needs to be defined"
+    when: item not in vars
+    with_items:
+    - master_hostname
+
+  - name: export all ocp project resources
+    become: yes
+    become_method: dzdo
+    script: "roles/openshift/files/ocp-project-backup.sh"
+    delegate_to: "{{ master_hostname }}"
+
+  - name: archive backup to /tmp
+    become: yes
+    become_method: dzdo
+    archive:
+      path: /tmp/backup/projects          
+      dest: /tmp/backup/{{ env }}.{{ansible_date_time.date}}.tar.gz
+    delegate_to: "{{ master_hostname }}"
+
+  - name: create backup folder on bastion if it doesn't exist
+    block:
+      - name: check folder
+        stat:
+          path: /home/{{ o_user }}/ocp_project_backup
+        register: folder
+      - name: create folder if doesn't exist
+        file:
+          path: /home/{{ o_user }}/ocp_project_backup  
+          state: directory
+          mode: 0755
+        when: not folder.stat.exists
+
+  - name: change file permission
+    become: yes
+    become_method: dzdo
+    command: chmod 777 /tmp/backup/{{ env }}.{{ansible_date_time.date}}.tar.gz
+    delegate_to: "{{ master_hostname }}"
+
+  - name: copy archive file to bastion
+    become: yes
+    become_method: dzdo
+    fetch:
+      src: /tmp/backup/{{ env }}.{{ansible_date_time.date}}.tar.gz
+      dest: /home/{{ o_user }}/ocp_project_backup/
+      flat: yes
+    delegate_to: "{{ master_hostname }}"
+
+  - name: cleanup on "{{ master_hostname }}"
+    become: yes
+    become_method: dzdo
+    file:
+      state: absent
+      path: /tmp/backup
+    delegate_to: "{{ master_hostname }}"
+
+  - name: find all files that are older than 1 week
+    become: yes
+    become_method: dzdo
+    find:
+      paths: "/home/{{ o_user }}/ocp_project_backup/"
+      age: "7d"
+      file_type: file
+    register: dirsOlderThan7d
+
+  - name: remove files older than 1 week
+    become: yes
+    become_method: dzdo
+    file:
+      path: "{{ item.path }}" 
+      state: absent
+    with_items: "{{ dirsOlderThan7d.files }}"
+
+  - name: check if cronjob exist
+    become: yes
+    become_method: dzdo
+    stat: 
+      path: /etc/cron.d/ocp-project-backup
+    register: cron
+    tags:
+    - cronjob        
+
+  - name: create cronjob 
+    become: yes
+    become_method: dzdo
+    cron:
+      name: ocp project backup
+      job: "/usr/bin/ansible-playbook --extra-vars \"master_hostname={{ master_hostname }}\" /home/{{ o_user }}/cloud_automation/AWS/compute/ansible/playbooks/day2_ocp_project_backup.yml"
+      user: "{{ o_user }}"
+      cron_file: "ocp-project-backup"
+      minute: "{{ cron_minute }}"
+      hour: "{{ cron_hour }}"
+      weekday: "{{ cron_weekday }}"
+      state: present
+    when: not cron.stat.exists
+    tags:
+    - cronjob

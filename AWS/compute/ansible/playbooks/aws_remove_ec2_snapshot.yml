@@ -1,0 +1,39 @@
+---
+#####
+#
+# Playbook to remove snapshots of EC2 instances
+#
+# Instruction:
+#    To run:
+#      1. Run playbook: ansible-playbook -e "region=<region> start_time=<start_time>" aws_remove_ec2_snapshot.yml
+#
+# Example: ansible-playbook -e "region=us-west-1 start_time=2020-07-17" aws_remove_ec2_snapshot.yml
+#
+# LastUpdated: 2020-07-20
+# UpdatedBy: IP Sam (CONIWS@capgroup.com)
+#
+
+- hosts: localhost
+  connection: local
+  gather_facts: yes
+
+  vars:
+    region: us-west-1
+    start_time: "2020-07-17"
+
+  tasks:
+
+    - name: Get snapshot id
+      ec2_snapshot_facts:
+        region: "{{ region }}"
+      register: id_snapshot
+
+    - name: delete snapshot
+      local_action:
+        module: ec2_snapshot
+        region: "{{ region }}"
+        snapshot_id: "{{ item.snapshot_id }}"
+        state: absent
+      when: start_time in item.start_time and item.description == ""
+      loop: "{{ id_snapshot.snapshots }}"
+

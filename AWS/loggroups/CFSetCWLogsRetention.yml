@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Set Cloudwatch logs retention template
+Resources:
+  LFSetLogRetention:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Handler: "index.lambda_handler"
+      Runtime: "python3.7"
+      Role: !GetAtt LFSetLogRetentionRole.Arn
+      Timeout: 120
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import boto3
+          import logging
+          import botocore
+          import json
+          from botocore.vendored import requests
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def sendResponse(event, context, responseStatus, responseData):
+              responseBody = {'Status': responseStatus,
+                              'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
+                              'PhysicalResourceId': context.log_stream_name,
+                              'StackId': event['StackId'],
+                              'RequestId': event['RequestId'],
+                              'LogicalResourceId': event['LogicalResourceId'],
+                              'Data': responseData}
+              print('RESPONSE BODY:n' + json.dumps(responseBody))
+              try:
+                  req = requests.put(event['ResponseURL'], data=json.dumps(responseBody))
+                  if req.status_code != 200:
+                      print(req.text)
+                      raise Exception('Recieved non 200 response while sending response to CFN.')
+                  return
+              except requests.exceptions.RequestException as e:
+                  print(e)
+                  raise
+
+          def lambda_handler(event, context):
+              responseStatus = 'SUCCESS'
+              try:
+                  cwlogs = boto3.client('logs')
+                  # can_paginate = cwlogs.can_paginate("describe_log_groups")
+                  # logger.info(can_paginate)
+                  paginator = cwlogs.get_paginator('describe_log_groups')
+                  page_iterator = paginator.paginate(logGroupNamePrefix='/aws/')
+                  for page in page_iterator:
+                      for i, val in enumerate(page['logGroups']):
+                          print(i,",",val['logGroupName'])
+                          response = cwlogs.put_retention_policy(
+                              logGroupName=val['logGroupName'],
+                              retentionInDays=14
+                          )
+                          print(response)
+                  responseData = {'Success': 'Log retention updated successfully.'}
+                  sendResponse(event, context, responseStatus, responseData)
+
+              except Exception as e:
+                  logger.error('Something went wrong: ' + str(e))
+                  responseStatus = 'FAILURE'
+                  responseData = {'Failure': 'Log retention update unsuccessful.'}
+                  sendResponse(event, context, responseStatus, responseData)
+
+  LFSetLogRetentionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+      - PolicyName: LFSetLogRetentionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: 'logs:CreateLogGroup'
+              Resource: 'arn:aws:logs:*:*:*'
+            - Effect: Allow
+              Action:
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+                - 'logs:PutRetentionPolicy'
+                - 'logs:DescribeLogGroups'
+              Resource:
+                - '*'
+
+  LFSetLogRetentionLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFSetLogRetention
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFSetLogRetention
+      RetentionInDays: 14
+
+  TriggerLambda:
+    Type: "Custom::TriggerLambda"
+    DeletionPolicy: Retain
+    DependsOn:
+    - LFSetLogRetention
+    - LFSetLogRetentionRole
+    Properties:
+      ServiceToken: !GetAtt LFSetLogRetention.Arn

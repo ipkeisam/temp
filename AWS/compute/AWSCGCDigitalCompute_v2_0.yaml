@@ -1,0 +1,1135 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CGC Digital Compute Build Cloud Formation Template
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Can contain only ASCII characters.
+  InstanceType:
+    Description: EC2 Instance Type
+    Type: String
+    Default: t2.medium
+    AllowedValues:
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - m3.medium
+    - m3.large
+    - m3.xlarge
+    - m3.2xlarge
+    - c3.large
+    - c3.xlarge
+    - c3.2xlarge
+    - c3.4xlarge
+    - c3.8xlarge
+    - g2.2xlarge
+    - r3.large
+    - r3.xlarge
+    - r3.2xlarge
+    - r3.4xlarge
+    - r3.8xlarge
+    - i2.xlarge
+    - i2.2xlarge
+    - i2.4xlarge
+    - i2.8xlarge
+    - hi1.4xlarge
+    - hs1.8xlarge
+    - cr1.8xlarge
+    - cc2.8xlarge
+    ConstraintDescription: Must specify a valid EC2 instance type
+  EnvironmentType:
+    Description: Provide Environment Type
+    Type: String
+    Default: FTDEV
+    AllowedValues:
+    - FTDEV
+    - DEV
+    - TST
+    - STG
+    - PRD
+    ConstraintDescription: Must specify a valid environment
+  ApplicationType:
+    Description: Provide Application Type
+    Type: String
+    Default: Apache
+    AllowedValues:
+    - Base
+    - Apache
+    - Tomcat
+    - AEM
+    - Database
+    ConstraintDescription: Must specify an application
+  ATMID:
+    Description: Provide ATM ID
+    Type: String
+    AllowedValues:
+    - AA00002573
+    ConstraintDescription: Must specify an ATM ID
+  MFT:
+    Description: Create MFT jail directories ( Optional )
+    Type: String
+    Default: false    
+    AllowedValues:
+    - true
+    - false 
+Mappings:
+  AWSInstanceType2Arch:
+    t2.micro:
+      Arch: HVM64
+    t2.small:
+      Arch: HVM64
+    t2.medium:
+      Arch: HVM64
+    m3.medium:
+      Arch: HVM64
+    m3.large:
+      Arch: HVM64
+    m3.xlarge:
+      Arch: HVM64
+    m3.2xlarge:
+      Arch: HVM64
+    c3.large:
+      Arch: HVM64
+    c3.xlarge:
+      Arch: HVM64
+    c3.2xlarge:
+      Arch: HVM64
+    c3.4xlarge:
+      Arch: HVM64
+    c3.8xlarge:
+      Arch: HVM64
+    g2.2xlarge:
+      Arch: HVM64
+    r3.large:
+      Arch: HVM64
+    r3.xlarge:
+      Arch: HVM64
+    r3.2xlarge:
+      Arch: HVM64
+    r3.4xlarge:
+      Arch: HVM64
+    r3.8xlarge:
+      Arch: HVM64
+    i2.xlarge:
+      Arch: HVM64
+    i2.2xlarge:
+      Arch: HVM64
+    i2.4xlarge:
+      Arch: HVM64
+    i2.8xlarge:
+      Arch: HVM64
+    hi1.4xlarge:
+      Arch: HVM64
+    hs1.8xlarge:
+      Arch: HVM64
+    cr1.8xlarge:
+      Arch: HVM64
+    cc2.8xlarge:
+      Arch: HVM64
+  AWSRegionArch2AMI:
+    us-east-1:
+      HVM64: ami-c998b6b2
+    us-west-2:
+      HVM64: ami-223f945a
+    us-west-1:
+      HVM64: ami-66eec506
+  Environments:
+    FTDEV:
+      AdminSG: sg-31e2b54c
+      WebSG: sg-18f2a565
+      AppSG: sg-34da8d49
+      DBSG: ''
+      AdminSubnet: subnet-aac254e2
+      WebSubnet: subnet-0dce5845
+      AppSubnet: subnet-abc254e3
+      VPCAdm: vpc-230a2745
+    DEV:
+      AdminSG: sg-0a04186c
+      WebSG: sg-3b0b175d
+      AppSG: sg-ea05198c
+      DBSG: ''
+      AdminSubnet: subnet-e207d4b9
+      WebSubnet: subnet-8201d2d9
+      AppSubnet: subnet-d201d289
+      VPCAdm: vpc-2ca2414b
+    TST:
+      AdminSG: sg-0a04186c
+      WebSG: sg-3b0b175d
+      AppSG: sg-ea05198c
+      DBSG: ''
+      AdminSubnet: subnet-e207d4b9
+      WebSubnet: subnet-8201d2d9
+      AppSubnet: subnet-d201d289
+      VPCAdm: vpc-2ca2414b
+    STG:
+      AdminSG: ''
+      WebSG: ''
+      AppSG: ''
+      DBSG: ''
+      AdminSubnet: ''
+      WebSubnet: ''
+      AppSubnet: ''
+      VPCAdm: ''
+    PRD:
+      AdminSG: ''
+      WebSG: ''
+      AppSG: ''
+      DBSG: ''
+      AdminSubnet: ''
+      WebSubnet: ''
+      AppSubnet: ''
+      VPCAdm: ''
+Conditions:
+  IsFTDEVEnv:
+    Fn::Equals:
+    - Ref: EnvironmentType
+    - FTDEV
+  IsDevEnv:
+    Fn::Equals:
+    - Ref: EnvironmentType
+    - DEV
+  IsTSTEnv:
+    Fn::Equals:
+    - Ref: EnvironmentType
+    - TST
+  IsSTGEnv:
+    Fn::Equals:
+    - Ref: EnvironmentType
+    - STG
+  IsPRDenv:
+    Fn::Equals:
+    - Ref: EnvironmentType
+    - PRD
+  IsApacheApp:
+    Fn::Equals:
+    - Ref: ApplicationType
+    - Apache
+  IsTomcatApp:
+    Fn::Equals:
+    - Ref: ApplicationType
+    - Tomcat
+  IsAEMApp:
+    Fn::Equals:
+    - Ref: ApplicationType
+    - AEM
+  IsDatabaseApp:
+    Fn::Equals:
+    - Ref: ApplicationType
+    - Database
+  IsAppTier:
+    Fn::Not:
+    - Fn::Equals:
+      - Ref: ApplicationType
+      - Apache
+  IsNotBase:
+    Fn::Not:
+    - Fn::Equals:
+      - Ref: ApplicationType
+      - Base
+  IsMFT:
+    Fn::Equals:
+    - Ref: MFT
+    - true      
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          base:
+          - baseconfig
+          dev:
+          - baseconfig
+          - devconfig
+          tst:
+          - baseconfig
+          - tstconfig
+          stg:
+          - baseconfig
+          - stgconfig
+          prd:
+          - baseconfig
+          - prdconfig
+        baseconfig:
+          commands:
+            groups:
+              command: for group in afweb afwggrp afdevgrp mft;do groupadd -r ${group}; done
+            digitaladmin:
+              command: for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+            digidev:
+              command: for a in 1 2 3 4 5 6 7 8 9 10;do useradd digidev$a;echo AlfaR0meo2 | passwd --stdin digidev$a; done
+            computeadmin:
+              command: for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+            xldeployacct:
+              command: useradd aradeploydev;echo AlfaR0meo2 | passwd --stdin aradeploydev
+            cyarkacct:
+              command: useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+            digitalacct:
+              command: useradd afadmin; useradd afdevadm; useradd jobafdev; useradd apdev; useradd mftadm
+            grpmembership:
+              command: usermod -a -G afweb,afwggrp,afdevgrp,mft afadmin; usermod -a -G afdevgrp,afwggrp,mft afdevadm; usermod -a -G afdevgrp,afwggrp,mft jobafdev; usermod -a -G afdevgrp,afwggrp apdev; usermod -a -G mft mftadm
+            passauthenable:
+              command: echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+          services: {}
+        devconfig:
+          files:
+            "/etc/ssh/ssh_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/ssh_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sshd_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sshd_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sudoers":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sudoers"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/sysctl.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/security/limits.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/resolv.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/resolv.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+          commands:
+            groups:
+              command: for group in afweb afwggrp afdevgrp mft;do groupadd -r ${group}; done
+            digitaladmin:
+              command: for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+            digidev:
+              command: for a in 1 2 3 4 5 6 7 8 9 10;do useradd digidev$a;echo AlfaR0meo2 | passwd --stdin digidev$a; done
+            computeadmin:
+              command: for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+            xldeployacct:
+              command: useradd aradeploydev;echo AlfaR0meo2 | passwd --stdin aradeploydev
+            cyarkacct:
+              command: useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+            digitalacct:
+              command: useradd afadmin; useradd afdevadm; useradd jobafdev; useradd apdev; useradd mftadm
+            grpmembership:
+              command: usermod -a -G afweb,afwggrp,afdevgrp,mft afadmin; usermod -a -G afdevgrp,afwggrp,mft afdevadm; usermod -a -G afdevgrp,afwggrp,mft jobafdev; usermod -a -G afdevgrp,afwggrp apdev; usermod -a -G mft mftadm
+        tstconfig:
+          files:
+            "/etc/ssh/ssh_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/ssh_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sshd_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sshd_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sudoers":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sudoers"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/sysctl.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/security/limits.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/resolv.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/resolv.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+          commands:
+            groups:
+              command: for group in afweb afwggrp afqagrp mft;do groupadd -r ${group}; done
+            digitaladmin:
+              command: for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+            digiqm:
+              command: for a in 1 2 3 4 5;do useradd digiqm$a;echo AlfaR0meo2 | passwd --stdin digiqm$a; done
+            computeadmin:
+              command: for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+            xldeployacct:
+              command: useradd aradeployqa;echo AlfaR0meo2 | passwd --stdin aradeployqa
+            cyarkacct:
+              command: useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+            digitalacct:
+              command: useradd afadmin; useradd afqaadm; useradd jobafqa; useradd apqa; useradd mftadm
+            grpmembership:
+              command: usermod -a -G afweb,afwggrp,afqagrp,mft afadmin; usermod -a -G afqagrp,afwggrp,mft afqaadm; usermod -a -G afqagrp,afwggrp,mft jobafqa; usermod -a -G afqagrp,afwggrp apqa; usermod -a -G mft mftadm
+        stgconfig:
+          files:
+            "/etc/ssh/ssh_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/ssh_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sshd_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sshd_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sudoers":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sudoers"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/sysctl.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/security/limits.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/resolv.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/resolv.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+          commands:
+            groups:
+              command: for group in afweb afwggrp afstggrp mft;do groupadd -r ${group}; done
+            digitaladmin:
+              command: for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+            digiappsupport:
+              command: for a in 1 2 3 4 5;do useradd digiappsupport$a;echo AlfaR0meo2 | passwd --stdin digiappsupport$a; done
+            computeadmin:
+              command: for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+            xldeployacct:
+              command: useradd aradeployat;echo AlfaR0meo2 | passwd --stdin aradeployat
+            cyarkacct:
+              command: useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+            digitalacct:
+              command: useradd afadmin; useradd afstgadm; useradd jobafstg; useradd apstg; useradd mftadm
+            grpmembership:
+              command: usermod -a -G afweb,afwggrp,afstggrp,mft afadmin; usermod -a -G afstggrp,afwggrp,mft afstgadm; usermod -a -G afstggrp,afwggrp,mft jobafstg; usermod afstggrp,afwggrp apstg; usermod -a -G mft mftadm
+        prdconfig:
+          files:
+            "/etc/ssh/ssh_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/ssh_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sshd_config":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sshd_config"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/ssh/sudoers":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/sudoers"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/sysctl.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/security/limits.d/30-CG-LNX-os_hardening.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/30-CG-LNX-os_hardening.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            "/etc/resolv.conf":
+              source:
+                Fn::Join:
+                - ''
+                - - http://s3.amazonaws.com/
+                  - Ref: EnvironmentType
+                  - "/resolv.conf"
+              mode: '000644'
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+          commands:
+            groups:
+              command: for group in afweb afwggrp mft;do groupadd -r ${group}; done
+            digitaladmin:
+              command: for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+            digiappsupport:
+              command: for a in 1 2 3 4 5;do useradd digiappsupport$a;echo AlfaR0meo2 | passwd --stdin digiappsupport$a; done
+            computeadmin:
+              command: for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+            xldeployacct:
+              command: useradd aradeployprod;echo AlfaR0meo2 | passwd --stdin aradeployprod
+            cyarkacct:
+              command: useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+            digitalacct:
+              command: useradd afadmin; useradd jobafweb; useradd apprd; useradd mftadm
+            grpmembership:
+              command: usermod -a -G afweb,afwggrp,mft afadmin; usermod -a -G afweb,afwggrp apprd; usermod -a -G afweb,afwggrp,mft jobafweb; usermod -a -G mft mftadm
+    Properties:
+      Tags:
+      - Key: env-type
+        Value: digital
+      - Key: cloud-dependency
+        Value: cloudonly
+      - Key: p-id
+        Value:
+          Ref: ATMID
+      - Key: sec-profile
+        Value: normal
+      - Key: app-type
+        Value:
+          Ref: ApplicationType 
+      ImageId:
+        Fn::FindInMap:
+        - AWSRegionArch2AMI
+        - Ref: AWS::Region
+        - Fn::FindInMap:
+          - AWSInstanceType2Arch
+          - Ref: InstanceType
+          - Arch
+      KeyName:
+        Ref: KeyName
+      InstanceType:
+        Ref: InstanceType
+      NetworkInterfaces:
+      - NetworkInterfaceId:
+          Ref: Eth0
+        DeviceIndex: '0'
+      - Fn::If:
+        - IsAppTier
+        - NetworkInterfaceId:
+            Ref: AppEth1
+          DeviceIndex: '1'
+        - NetworkInterfaceId:
+            Ref: WebEth1
+          DeviceIndex: '1'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          #
+          # update sshd_config to allow password auth
+          sed -i 's/^ssh_pwauth:.*/ssh_pwauth:   1/' /etc/cloud/cloud.cfg
+          sed -i 's/^PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          # only allow strong ciphers for ssh
+          sed -i '/#   Protocol 2/a Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour\nMACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160' /etc/ssh/ssh_config
+          sed -i '/#RekeyLimit default none/a Ciphers aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,arcfour\nMACS hmac-sha1,hmac-sha2-256,hmac-sha2-512,hmac-ripemd160' /etc/ssh/sshd_config
+          # restart sshd daemon 
+          service sshd restart
+          #
+          # Make sure EBS volumes have been created AND attached to this instance !
+          # Wait for volume to be available 
+          while [ ! -e /dev/xvdf ] ; do echo waiting for /dev/xvdf to attach; sleep 10 ; done
+          # Format /dev/xvdf if it does not contain a partition yet
+          if file -b -s /dev/xvdf == "data" ; then
+            mkfs.ext4 /dev/xvdf
+          fi
+          # Wait for volume to be available
+          while [ ! -e /dev/xvdg] ; do echo waiting for /dev/xvdg to attach; sleep 10 ; done
+          # Format /dev/xvdg if if it does not contain a partition yet
+          if file -b -s /dev/xvdg == "data" ; then
+            mkfs.ext4 /dev/xvdg
+          fi
+          # Wait for volume to be available
+          while [ ! -e /dev/xvdh ] ; do echo waiting for /dev/xvdh to attach; sleep 10 ; done
+          # Format /dev/xvdh if it does not contain a partition yet
+          if file -b -s /dev/xvdh == "data" ; then
+            mkfs.ext4 /dev/xvdh
+          fi
+           # Wait for volume to be available
+          while [ ! -e /dev/xvdi ] ; do echo waiting for /dev/xvdi to attach; sleep 10 ; done
+          # Format /dev/xvdi if it does not contain a partition yet
+          if file -b -s /dev/xvdi == "data" ; then
+            mkfs.ext4 /dev/xvdi
+          fi
+           # Wait for volume to be available
+          while [ ! -e /dev/xvdj ] ; do echo waiting for /dev/xvdj to attach; sleep 10 ; done
+          # Format /dev/xvdj if it does not contain a partition yet
+          if file -b -s /dev/xvdj == "data" ; then
+            mkfs.ext4 /dev/xvdj
+          fi                                    
+          # Persist the volume in /etc/fstab so it gets mounted again
+          echo '/dev/xvdf       /users/cgc                  ext4    defaults,nofail 0       2' >> /etc/fstab
+          echo '/dev/xvdg       /users/cgc/shared/logs      ext4    defaults,nofail 0       2' >> /etc/fstab 
+          echo '/dev/xvdh       /users/cgc/shared/tmp       ext4    defaults,nofail 0       2' >> /etc/fstab 
+          echo '/dev/xvdi       /users/cgc/shared/release   ext4    defaults,nofail 0       2' >> /etc/fstab
+          echo '/dev/xvdj       /users/cgc/shared/tools     ext4    defaults,nofail 0       2' >> /etc/fstab
+          # create /users/cgc mount point and mount volume
+          mkdir -p /users/cgc
+          mount /dev/xvdf /users/cgc
+          # create rest of moint point and mount all
+          mkdir -p /users/cgc/shared/{logs,tmp,release,tools}
+          mount -a
+          # create AEM mount
+          if [ ${ApplicationType} == AEM ]; then
+          # Wait for volume to be available
+            while [ ! -e /dev/xvdk ]; do echo waiting for /dev/xvdk to attach; sleep 10; done
+            # Format /dev/xvdk if it does not contain a partition yet
+            if file -b -s /dev/xvdk == "data"; then
+              mkfs.ext4 /dev/xvdk
+            fi
+            # Persist the volume in /etc/fstab so it gets mounted again
+            echo '/dev/xvdk       /users/cgc/cmn/dev/aem      ext4    defaults,nofail 0       2' >> /etc/fstab
+            mkdir -p /users/cgc/cmn/dev/aem
+            mount /dev/xvdk /users/cgc/cmn/dev/aem                     
+          fi
+          # creat MFT mount which only should be on Tomcat instances
+          if [ ${MFT} == true ]; then
+          # Wait for volume to be available
+            while [ ! -e /dev/xvdl ]; do echo waiting for /dev/xvdk to attach; sleep 10; done
+            # Format /dev/xvdk if it does not contain a partition yet
+            if file -b -s /dev/xvdl == "data"; then
+              mkfs.ext4 /dev/xvdl
+            fi
+            # Persist the volume in /etc/fstab so it gets mounted again
+            echo '/dev/xvdl       /users/jail/mft      ext4    defaults,nofail 0       2' >> /etc/fstab
+            mkdir -p /users/jail/mft
+            mount /dev/xvdl /users/jail/mft          
+          fi                            
+          # create users and groups, assign filesystem ownership and mount AEM volume
+          if [[ ${EnvironmentType} == @(FTDEV|DEV) ]] ; then
+              for group in afweb afwggrp afdevgrp mft;do groupadd -r $group; done
+              for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+              for a in 1 2 3 4 5 6 7 8 9 10;do useradd digidev$a;echo AlfaR0meo2 | passwd --stdin digidev$a; done
+              for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+              useradd aradeploydev;echo AlfaR0meo2 | passwd --stdin aradeploydev
+              useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+              useradd afadmin; useradd afdevadm; useradd jobafdev; useradd apdev; useradd mftadm
+              usermod -a -G afweb,afwggrp,afdevgrp,mft afadmin; usermod -a -G afdevgrp,afwggrp,mft afdevadm; usermod -a -G afdevgrp,afwggrp,mft jobafdev; usermod -a -G afdevgrp,afwggrp apdev; usermod -a -G mft mftadm
+              chown -R afadmin:afweb /users/cgc
+              chown -R afadmin:afdevgrp /users/cgc/shared/logs
+              chown -R afadmin:afdevgrp /users/cgc/shared/tmp
+              chown -R afadmin:afweb	 /users/cgc/shared/release
+              chown -R afadmin:afweb	 /users/cgc/shared/tools
+              if [ ${ApplicationType} == AEM ]; then
+                chown -R afadmin:afweb /users/cgc/cmn/tst/aem
+              fi
+              if [ ${MFT} == true ]; then
+                chown -R mftadm:mft /users/jail/mft
+              fi                                              
+          fi
+          if [ ${EnvironmentType} == TST] ; then
+              for group in afweb afwggrp afqagrp mft;do groupadd -r $group; done
+              for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+              for a in 1 2 3 4 5;do useradd digiqm$a;echo AlfaR0meo2 | passwd --stdin digiqm$a; done
+              for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+              useradd aradeployqa;echo AlfaR0meo2 | passwd --stdin aradeployqa
+              useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+              useradd afadmin; useradd afqaadm; useradd jobafqa; useradd apqa; useradd mftadm
+              usermod -a -G afweb,afwggrp,afqagrp,mft afadmin; usermod -a -G afqagrp,afwggrp,mft afqaadm; usermod -a -G afqagrp,afwggrp,mft jobafqa; usermod -a -G afqagrp,afwggrp apqa; usermod -a -G mft mftadm
+              chown -R afadmin:afweb /users/cgc
+              chown -R afadmin:afdevgrp /users/cgc/shared/logs
+              chown -R afadmin:afdevgrp /users/cgc/shared/tmp
+              chown -R afadmin:afweb	 /users/cgc/shared/release
+              chown -R afadmin:afweb	 /users/cgc/shared/tools              
+              if [ ${ApplicationType} == AEM ]; then
+                chown -R afadmin:afweb /users/cgc/cmn/tst/aem
+              fi
+              if [ ${MFT} == true ]; then
+                chown -R mftadm:mft /users/jail/mft
+              fi                             
+          fi          
+          if [ ${EnvironmentType} == STG ] ; then
+              for group in afweb afwggrp afstggrp mft;do groupadd -r $group; donee
+              for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+              for a in 1 2 3 4 5;do useradd digiappsupport$a;echo AlfaR0meo2 | passwd --stdin digiappsupport$a; done
+              for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+              useradd aradeployat;echo AlfaR0meo2 | passwd --stdin aradeployat
+              useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+              useradd afadmin; useradd afstgadm; useradd jobafstg; useradd apstg; useradd mftadm
+              usermod -a -G afweb,afwggrp,afstggrp,mft afadmin; usermod -a -G afstggrp,afwggrp,mft afstgadm; usermod -a -G afstggrp,afwggrp,mft jobafstg; usermod afstggrp,afwggrp apstg; usermod -a -G mft mftadm
+              chown -R afadmin:afweb /users/cgc
+              chown -R afadmin:afwggrp /users/cgc/shared/logs
+              chown -R afadmin:afwggrp /users/cgc/shared/tmp
+              chown -R afadmin:afweb	 /users/cgc/shared/release
+              chown -R afadmin:afweb	 /users/cgc/shared/tools              
+              if [ ${ApplicationType} == AEM ]; then
+                chown -R afadmin:afweb /users/cgc/cmn/stg/aem
+              fi
+              if [ ${MFT} == true ]; then
+                chown -R mftadm:mft /users/jail/mft
+              fi                             
+          fi
+          if [ ${EnvironmentType} == PRD] ; then
+              for group in afweb afwggrp mft;do groupadd -r $group; done
+              for a in 1 2 3 4 5 6 7 8 9 10;do useradd digitaladmin$a;echo AlfaR0meo2 | passwd --stdin digitaladmin$a; done
+              for a in 1 2 3 4 5;do useradd digiappsupport$a;echo AlfaR0meo2 | passwd --stdin digiappsupport$a; done
+              for a in 1 2;do useradd computeadmin$a;echo AlfaR0meo2 | passwd --stdin computeadmin$a; done
+              useradd aradeployprod;echo AlfaR0meo2 | passwd --stdin aradeployprod
+              useradd cyark_rc;echo AlfaR0meo2 | passwd --stdin cyark_rc
+              useradd afadmin; useradd jobafweb; useradd apprd; useradd mftadm
+              usermod -a -G afweb,afwggrp,mft afadmin; usermod -a -G afweb,afwggrp apprd; usermod -a -G afweb,afwggrp,mft jobafweb; usermod -a -G mft mftadm
+              chown -R afadmin:afweb /users/cgc
+              chown -R afadmin:afwggrp /users/cgc/shared/logs
+              chown -R afadmin:afwggrp /users/cgc/shared/tmp
+              chown -R afadmin:afweb	 /users/cgc/shared/release
+              chown -R afadmin:afweb	 /users/cgc/shared/tools
+              if [ ${ApplicationType} == AEM ]; then
+                chown -R afadmin:afweb /users/cgc/cmn/prd/aem
+              fi
+              if [ ${MFT} == true ]; then
+                chown -R mftadm:mft /users/jail/mft
+              fi                            
+          fi
+          # setup sudoers file
+          # add sudo command aliases
+          sed -i -e '$a\## sudo commands aliases' /etc/sudoers
+          sed -i -e '$a\Cmnd_Alias SUAFADMIN=/usr/bin/sudo su - afadmin, /bin/su - afadmin, /usr/bin/sudo su afadmin, /bin/su afadmin' /etc/sudoers
+          sed -i -e '$a\Cmnd_Alias SUMFTADM=/usr/bin/sudo su - mftadm, /bin/su - mftadm, /usr/bin/sudo su mftadm, /bin/su mftadm' /etc/sudoers          
+          if [[ ${EnvironmentType} == @(FTDEV|DEV) ]] ; then
+            echo 'Cmnd_Alias SUJOBAFDEV=/usr/bin/sudo su - jobafdev, /bin/su - jobafdev, /usr/bin/sudo su jobafdev, /bin/su jobafdev' >> /etc/sudoers
+            echo 'Cmnd_Alias SUAFDEVADM=/usr/bin/sudo su - afdevadm, /bin/su - afdevadm, /usr/bin/sudo su afdevadm, /bin/su afdevadm' >> /etc/sudoers
+            echo 'Cmnd_Alias SUAPDEV=/usr/bin/sudo su - apdev, /bin/su - apdev, /usr/bin/sudo su apdev, /bin/su apdev' >> /etc/sudoers
+          fi
+          if [ ${EnvironmentType} == TST ] ; then
+            echo 'Cmnd_Alias SUJOBAFQA=/usr/bin/sudo su - jobafqa, /bin/su - jobafqa, /usr/bin/sudo su jobafqa, /bin/su jobafqa' >> /etc/sudoers
+            echo 'Cmnd_Alias SUAFQAADM=/usr/bin/sudo su - afqaadm, /bin/su - afqaadm, /usr/bin/sudo su afqaadm, /bin/su afqaadm' >> /etc/sudoers
+            echo 'Cmnd_Alias SUAPQA=/usr/bin/sudo su - apqa, /bin/su - apqa, /usr/bin/sudo su apqa, /bin/su apqa' >> /etc/sudoers
+          fi
+          if [ ${EnvironmentType} == STG ] ; then
+            echo 'Cmnd_Alias SUJOBASTG=/usr/bin/sudo su - jobafstg, /bin/su - jobafstg, /usr/bin/sudo su jobafstg, /bin/su jobafstg' >> /etc/sudoers
+            echo 'Cmnd_Alias SUAFSTGADM=/usr/bin/sudo su - afstgadm, /bin/su - afstgadm, /usr/bin/sudo su afstgadm, /bin/su afstgadm' >> /etc/sudoers
+            echo 'Cmnd_Alias SUAPSTG=/usr/bin/sudo su - apstg, /bin/su - apstg, /usr/bin/sudo su apstg, /bin/su apstg' >> /etc/sudoers
+          fi
+          if [ ${EnvironmentType} == PRD ] ; then
+            echo 'Cmnd_Alias SUJOBAFWEB=/usr/bin/sudo su - jobafweb, /bin/su - jobafweb, /usr/bin/sudo su jobafweb, /bin/su jobafweb' >> /etc/sudoers
+            echo 'Cmnd_Alias SUAPPRD=/usr/bin/sudo su - apprd, /bin/su - apprd, /usr/bin/sudo su apprd, /bin/su apprd' >> /etc/sudoers
+          fi          
+          # add sudo access
+          for a in 1 2;do echo computeadmin$a   ALL=\(ALL\)       ALL >> /etc/sudoers; done
+          for a in 1 2 3 4 5 6 7 8 9 10; do echo digitaladmin$a   ALL=NOPASSWD: SUAFADMIN, SUJOBAFDEV, SUAFDEVADM, SUAPDEV, SUMFTADM >> /etc/sudoers; done
+          echo cyark_rc        ALL=\(ALL\)       NOPASSWD: ALL >> /etc/sudoers
+          if [[ ${EnvironmentType} == @(FTDEV|DEV) ]] ; then
+            for a in 1 2 3 4 5 6 7 8 9 10; do echo digitaladmin$a   ALL=NOPASSWD: SUAFADMIN, SUJOBAFDEV, SUAFDEVADM, SUAPDEV, SUMFTADM >> /etc/sudoers; done
+            for a in 1 2 3 4 5 6 7 8 9 10; do echo digidev$a   ALL=NOPASSWD: SUJOBAFDEV, SUAFDEVADM, SUAPDEV, SUMFTADM >> /etc/sudoers; done
+          fi
+          if [ ${EnvironmentType} == TST ] ; then
+            for a in 1 2 3 4 5 6 7 8 9 10; do echo digitaladmin$a   ALL=NOPASSWD: SUAFADMIN, SUJOBAFQA, SUAFQAADM, SUAPQA, SUMFTADM >> /etc/sudoers; done
+            for a in 1 2 3 4 5; do echo digiqm$a	   ALL=NOPASSWD: SUJOBAFQA, SUAFQAADM, SUAPQA, SUMFTADM	>> /etc/sudoers; done
+          fi
+          if [ ${EnvironmentType} == STG ] ; then
+            for a in 1 2 3 4 5 6 7 8 9 10; do echo digitaladmin$a   ALL=NOPASSWD: SUAFADMIN, SUJOBAFSTG, SUAFSTGADM, SUAPSTG, SUMFTADM >> /etc/sudoers; done
+            for a in 1 2 3 4 5 6 7 8 9 10; do echo digiappsupport$a ALL=NOPASSWD: SUJOBAFSTG, SUAFSTGADM, SUAPSTG, SUMFTADM	>> /etc/sudoers; done
+          fi
+          if [ ${EnvironmentType} == PRD ] ; then
+            for a in 1 2 3 4 5 6 7 8 9 10; do echo digitaladmin$a   ALL=NOPASSWD: SUAFADMIN, SUJOBAFWEB, SUAPPRD, SUMFTADM >> /etc/sudoers; done
+            for a in 1 2 3 4 5 6 7 8 9 10; do echo digiappsupport$a ALL=NOPASSWD: SUAFADMIN, SUJOBAFWEB, SUAPPRD, SUMFTADM >> /etc/sudoers; done
+          fi                                 
+  Eth0:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      Description: eth0
+      GroupSet:
+      - Fn::FindInMap:
+        - Environments
+        - Ref: EnvironmentType
+        - AdminSG
+      SourceDestCheck: 'true'
+      SubnetId:
+        Fn::FindInMap:
+        - Environments
+        - Ref: EnvironmentType
+        - AdminSubnet
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      - Key: Interface
+        Value: eth0
+  WebEth1:
+    Type: AWS::EC2::NetworkInterface
+    Condition: IsApacheApp
+    Properties:
+      Description: eth1
+      GroupSet:
+      - Fn::FindInMap:
+        - Environments
+        - Ref: EnvironmentType
+        - WebSG
+      SourceDestCheck: 'true'
+      SubnetId:
+        Fn::FindInMap:
+        - Environments
+        - Ref: EnvironmentType
+        - WebSubnet
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      - Key: Interface
+        Value: eth1
+  AppEth1:
+    Type: AWS::EC2::NetworkInterface
+    Condition: IsAppTier
+    Properties:
+      Description: eth1
+      GroupSet:
+      - Fn::FindInMap:
+        - Environments
+        - Ref: EnvironmentType
+        - AppSG
+      SourceDestCheck: 'true'
+      SubnetId:
+        Fn::FindInMap:
+        - Environments
+        - Ref: EnvironmentType
+        - AppSubnet
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      - Key: Interface
+        Value: eth1
+  CgcVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsNotBase
+    Properties:
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      Size: '100'
+      Encrypted: 'true'
+      VolumeType: gp2
+      AvailabilityZone:
+        Fn::GetAtt:
+        - EC2Instance
+        - AvailabilityZone
+  MountPoint1:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsNotBase
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      VolumeId:
+        Ref: CgcVolume
+      Device: "/dev/sdf"
+  LogVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsNotBase
+    Properties:
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      Size: '75'
+      Encrypted: 'true'
+      VolumeType: gp2
+      AvailabilityZone:
+        Fn::GetAtt:
+        - EC2Instance
+        - AvailabilityZone
+  MountPoint2:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsNotBase
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      VolumeId:
+        Ref: LogVolume
+      Device: "/dev/sdg"
+  TmpVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsNotBase
+    Properties:
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      Size: '50'
+      Encrypted: 'true'
+      VolumeType: gp2
+      AvailabilityZone:
+        Fn::GetAtt:
+        - EC2Instance
+        - AvailabilityZone
+  MountPoint3:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsNotBase
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      VolumeId:
+        Ref: TmpVolume
+      Device: "/dev/sdh"
+  ReleaseVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsNotBase
+    Properties:
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      Size: '50'
+      Encrypted: 'true'
+      VolumeType: gp2
+      AvailabilityZone:
+        Fn::GetAtt:
+        - EC2Instance
+        - AvailabilityZone
+  MountPoint4:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsNotBase
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      VolumeId:
+        Ref: ReleaseVolume
+      Device: "/dev/sdi"
+  ToolsVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsNotBase
+    Properties:
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      Size: '30'
+      Encrypted: 'true'
+      VolumeType: gp2
+      AvailabilityZone:
+        Fn::GetAtt:
+        - EC2Instance
+        - AvailabilityZone
+  MountPoint5:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsNotBase
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      VolumeId:
+        Ref: ToolsVolume
+      Device: "/dev/sdj"
+  AEMVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsAEMApp
+    Properties:
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      Size: '1000'
+      Encrypted: 'true'
+      VolumeType: gp2
+      AvailabilityZone:
+        Fn::GetAtt:
+        - EC2Instance
+        - AvailabilityZone
+  MountPoint6:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsAEMApp
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      VolumeId:
+        Ref: AEMVolume
+      Device: "/dev/sdk"
+  MFTVolume:
+    Type: AWS::EC2::Volume
+    Condition: IsMFT
+    Properties:
+      Tags:
+      - Key: usage-id
+        Value:
+          Ref: ATMID
+      Size: '10'
+      Encrypted: 'true'
+      VolumeType: gp2
+      AvailabilityZone:
+        Fn::GetAtt:
+        - EC2Instance
+        - AvailabilityZone
+  MountPoint7:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: IsMFT
+    Properties:
+      InstanceId:
+        Ref: EC2Instance
+      VolumeId:
+        Ref: MFTVolume
+      Device: "/dev/sdl"      
+Outputs:
+  MyStacksRegion:
+    Description: Region of EC2 Instance
+    Value:
+      Ref: AWS::Region
+  InstanceEth0:
+    Description: The private IP of eth0
+    Value:
+      Fn::GetAtt:
+      - Eth0
+      - PrimaryPrivateIpAddress
+  InstanceEth1:
+    Description: The private IP of eth1
+    Condition: IsNotBase
+    Value:
+      Fn::If:
+      - IsAppTier
+      - Fn::GetAtt:
+        - AppEth1
+        - PrimaryPrivateIpAddress
+      - Fn::GetAtt:
+        - WebEth1
+        - PrimaryPrivateIpAddress
+  Environment:
+    Description: Environment of EC2 Instance
+    Value:
+      Ref: EnvironmentType
+  ATMID:
+    Description: ATM ID
+    Value:
+      Ref: ATMID
+  ApplicationType:
+    Description: Application Type
+    Value:
+      Ref: ApplicationType
+  MFT:
+    Description: Create MFT Directory
+    Value:
+      Ref: MFT      

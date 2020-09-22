@@ -1,0 +1,37 @@
+---
+
+# 
+# provisions local accounts for Linux hosts 
+#
+
+- name: query for hostname
+  shell: hostname
+  ignore_errors: yes
+  register: instance_hostname
+
+- debug: 
+    msg: "{{ instance_hostname }}"  
+
+# all system-types, but environment-specific
+- name: "Create baseline set of env-specific local users for env={{ env_type }}"
+  user:
+    name: "{{ item.username }}"
+    group: "{{ item.primary_group | default(omit) }}"
+    groups: "{{ item.groups | default(omit) }}"
+    password: "{{ item.password | default(omit) }}"
+    update_password: "{{ item.update_password | default(omit) }}"
+  with_items: "{{ aws_ocp_os_accounts['service_now_unix'][env_type] }}"
+
+- name: "Create sudoers.d file"
+  template:
+    src: "templates/{{ item.sudoers_filename }}"
+    dest: "/etc/sudoers.d/{{ item.username }}"
+    owner: root
+    group: root
+    mode: 0440
+  when: item.sudoers_filename is defined
+  with_items: "{{ aws_ocp_os_accounts['service_now_unix'][env_type] }}"
+
+
+
+

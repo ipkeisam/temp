@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Account Builder OnSchedule Developer ServiceCatalog product.
+Parameters:
+  PortfolioProvider:
+    Type: String
+    Description: Owner and Distributor Name
+  LaunchConstraintARN:
+    Type: String
+    Description: ARN of the launch constraint role for account-builder products.
+  PortfolioId:
+    Type: String
+    Description: The ServiceCatalog portfolio this product will be attached to.
+  RepoRootURL:
+    Type: String
+    Description: Root url for the repo containing the product templates.
+  ServiceCatalogGovernanceTopic:
+    Type: String
+    Description: ARN of SNS Topic that receives notifications when a product is created.
+Resources:
+  SCABOnScheduleDeveloperProduct:
+    Type: 'AWS::ServiceCatalog::CloudFormationProduct'
+    Properties:
+      Name: Account Builder for Developer Accounts
+      Description: >-
+        This product kicks off the creation of a new AWS account on a schedule
+      Owner: !Ref PortfolioProvider
+      Distributor: !Ref PortfolioProvider
+      SupportDescription: Cloud Support Team
+      SupportEmail: PDS_-_Platform_Design_services@capgroup.com
+      AcceptLanguage: en
+      SupportUrl: 'http://capitalgroup.service-now.com'
+      ProvisioningArtifactParameters:
+        - Description: baseline version
+          Info:
+            LoadTemplateFromURL: !Sub '${RepoRootURL}servicecatalog/account-builder/scheduler/CFABOSDeveloperSelfService.yml'
+          Name: v1.0
+  AssociateABOnScheduleDeveloper:
+    Type: 'AWS::ServiceCatalog::PortfolioProductAssociation'
+    Properties:
+      PortfolioId: !Ref PortfolioId
+      ProductId: !Ref SCABOnScheduleDeveloperProduct
+  ConstraintAccountBuilder:
+    Type: 'AWS::ServiceCatalog::LaunchRoleConstraint'
+    DependsOn: AssociateABOnScheduleDeveloper
+    Properties:
+      PortfolioId: !Ref PortfolioId
+      ProductId: !Ref SCABOnScheduleDeveloperProduct
+      RoleArn: !Ref LaunchConstraintARN
+      Description: !Ref LaunchConstraintARN
+
+  AccountBuilderCreatedLaunchNotification:
+    Type: "AWS::ServiceCatalog::LaunchNotificationConstraint"
+    Properties:
+      Description: "Publishes notifications when new account creation is launched."
+      NotificationArns: 
+        - !Ref ServiceCatalogGovernanceTopic
+      PortfolioId: !Ref PortfolioId
+      ProductId: !Ref SCABOnScheduleDeveloperProduct
+    DependsOn: AssociateABOnScheduleDeveloper
+Outputs:
+  ProductId:
+    Value: !Ref SCABOnScheduleDeveloperProduct

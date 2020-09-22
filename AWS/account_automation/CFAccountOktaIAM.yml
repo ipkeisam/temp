@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Baseline Okta IAM setup for new account
+
+Parameters:
+  SecFoundationAccountId:
+    Type: String
+    Default: 111417557820
+    Description: AWS Account Id of the sec foundation account (okta integration).
+    MaxLength: 12
+    MinLength: 12
+
+Resources:
+  OktaIdpCrossAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Okta-Idp-cross-account-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Ref SecFoundationAccountId
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/IAMReadOnlyAccess

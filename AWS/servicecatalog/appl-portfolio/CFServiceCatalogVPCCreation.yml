@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Network Onboarding for a custom VPC creation using service catalog product
+Parameters:
+  sourceBucket:
+    Default: organization-repo  
+    Type: String
+  NetworkAnsibleTowerURL:
+    Default: https://tower.cguser.capgroup.com/api/v2/job_templates/1049/launch/
+    Type: String
+  SecretsManagerRegion:
+    Default: us-east-1
+    Type: String
+  NetworkServiceAccountCreds:
+    Default: IAMAccessCredentials
+    Type: String
+Resources:
+  LFInvokeVPCCreation:
+    Type: 'AWS::Lambda::Function'
+    DependsOn: AlertsSNSTopic
+    Properties:
+      Environment:
+        Variables:
+          SecretsManagerRegionName: !Ref SecretsManagerRegion
+          NetworkServiceAccountCreds: !Ref NetworkServiceAccountCreds
+          NETWORK_TOWER_URL: !Ref NetworkAnsibleTowerURL
+          SNS_TOPIC_ARN: !Ref AlertsSNSTopic
+          SNS_REGION: us-east-1
+      Description: This function is the network onboarding module 
+      Handler: ServiceCatalog-LFCreateVPC.lambda_handler
+      Role: !GetAtt 
+        - LFInvokeVPCCreationRole
+        - Arn
+      Runtime: python3.8 
+      Layers: 
+        - arn:aws:lambda:us-east-1:848721808596:layer:http-requests:2
+      Timeout: 120
+      Code:
+        S3Bucket: !Ref sourceBucket
+        S3Key: "servicecatalog/appl-portfolio/ServiceCatalog-LFCreateVPC.zip"
+        S3ObjectVersion: "XE2BmDe_8sul07SD1266O.E_IhxawpB."
+      VpcConfig:
+        SecurityGroupIds: 
+          - sg-029facd71b9750091
+        SubnetIds: 
+          - subnet-0d16801c03a7f80d9
+          - subnet-0e9fb2a1b52350f64 
+  LFInvokeVPCCreationRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: LFInvokeVPCCreationRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: LFInvokeVPCCreationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:log-group:/aws/lambda/*:*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'kms:Decrypt'
+                  - 'kms:GenerateDataKey'
+                  - 'organizations:Describe*'
+                  - 'organizations:List*'
+                  - 'sns:Publish'
+                Resource:
+                  - '*'
+  LFInvokeVPCCreationLG:
+    Type: 'AWS::Logs::LogGroup'
+    DependsOn: LFInvokeVPCCreation
+    Properties:
+      LogGroupName:
+        'Fn::Join':
+          - ''
+          - - /aws/lambda/
+            - Ref: LFInvokeVPCCreation
+      RetentionInDays: 14
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    DependsOn: LFInvokeVPCCreation
+    Properties:
+      TopicName: ServiceCatalogVPCCreateTopic
+      Subscription:
+        - Endpoint:
+            Fn::GetAtt:
+               - LFInvokeVPCCreation
+               - Arn
+          Protocol: lambda
+  
+  AlertsSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: SNSTopicForSCVPCProductAlerts
+  
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn:
+        Ref: SNSTopic
+      FunctionName:
+        Fn::GetAtt:
+          - LFInvokeVPCCreation
+          - Arn
+  ServiceCatalogVPCTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: ServiceCatalogVPCTopicPolicy
+        Version: 2008-10-17
+        Statement:
+          - Sid: Access-Only-To-Master-Account
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action:
+              - 'SNS:Publish'
+              - 'SNS:RemovePermission'
+              - 'SNS:SetTopicAttributes'
+              - 'SNS:DeleteTopic'
+              - 'SNS:ListSubscriptionsByTopic'
+              - 'SNS:GetTopicAttributes'
+              - 'SNS:Receive'
+              - 'SNS:AddPermission'
+              - 'SNS:Subscribe'
+            Resource: !Ref 'SNSTopic'
+            Condition:
+              StringEquals:
+                'AWS:SourceOwner': !Ref 'AWS::AccountId'
+          - Sid: Publish-Access-to-member-accounts
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: 'SNS:Publish'
+            Resource: !Ref 'SNSTopic'
+            Condition:
+              StringEquals:
+                'aws:PrincipalOrgID': 'o-1eax4cor5e'
+      Topics:
+      - !Ref SNSTopic
+Outputs:
+  LFInvokeNetworkTowerAPIArn:
+    Value: !GetAtt LFInvokeVPCCreation.Arn

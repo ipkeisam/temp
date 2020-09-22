@@ -1,0 +1,36 @@
+---
+
+# these is currently done part of ec2 user data... 
+- name: query for hostname
+  shell: hostname
+  ignore_errors: yes
+  register: instance_hostname
+
+- debug: 
+    msg: "{{ instance_hostname }}"
+
+- name: check if filesystem has been formatted before continuing
+  command: file -s /dev/xvdc
+  register: output
+
+- debug:
+    msg: "{{ output }}"
+
+- name: format etcd volume
+  filesystem: 
+    dev=/dev/xvdc
+    fstype=ext4
+  when: 'data' not in output.stdout
+#  when: output.stdout.find('data') != -1
+
+- name: mount etcd filesystem
+  mount:
+    path: /var/lib/etcd 
+    src: /dev/xvdc  
+    fstype: ext4
+    state: present
+
+- name: display volume facts
+  ec2_vol_facts:
+    filters:
+      volume-id: vol-0b3b0f578cbbab812

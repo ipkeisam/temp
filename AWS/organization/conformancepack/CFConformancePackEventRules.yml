@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Event rule(s) for various compliance alerts
+Parameters:
+  EventBusAccountID:
+    Default: 848721808596  
+    Type: String
+Resources:
+  S3ChangeEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Direct all compliance S3 change events to an event bus in Master account
+      EventPattern:
+        source: 
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+        detail:
+          messageType:
+            - ComplianceChangeNotification
+          newEvaluationResult:
+            complianceType:
+              - NON_COMPLIANT
+          resourceType:
+            - AWS::S3::Bucket
+            - AWS::S3::AccountPublicAccessBlock
+      Name: S3ComplianceAlert-EventRule
+      State: ENABLED
+      Targets:
+        -
+          Arn: !Sub 'arn:aws:events:${AWS::Region}:${EventBusAccountID}:event-bus/default'
+          RoleArn:
+            Fn::GetAtt: 
+              - "S3ChangeEventRole"
+              - "Arn"
+          Id: "OrgComplianceEventBus"
+  S3ChangeEventRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Tags:
+        -
+           Key: cost-center
+           Value: 524154
+        -
+           Key: ppmc-id
+           Value: 69058
+        -
+           Key: toc
+           Value: ETOC
+        -
+           Key: usage-id
+           Value: BB00000008
+        -
+           Key: exp-date
+           Value: 99-00-9999
+        -
+           Key: env-type
+           Value: prd
+        -
+           Key: sd-period
+           Value: na
+        -
+           Key: category
+           Value: governance
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: S3EventBusPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource:
+                  - !Sub 'arn:aws:events:${AWS::Region}:${EventBusAccountID}:event-bus/default'
+  MLChangeEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Direct all compliance ML change events to an event bus in Master account
+      EventPattern:
+        source: 
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+        detail:
+          messageType:
+            - ComplianceChangeNotification
+          resourceType:
+            - AWS::SageMaker::NotebookInstance
+            - AWS::SageMaker::EndpointConfig
+      Name: MLComplianceAlert-EventRule
+      State: ENABLED
+      Targets:
+        -
+          Arn: !Sub 'arn:aws:events:${AWS::Region}:${EventBusAccountID}:event-bus/default'
+          RoleArn:
+            Fn::GetAtt: 
+              - "MLChangeEventRole"
+              - "Arn"
+          Id: "OrgComplianceEventBus"
+  MLChangeEventRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Tags:
+        -
+           Key: cost-center
+           Value: 524154
+        -
+           Key: ppmc-id
+           Value: 69058
+        -
+           Key: toc
+           Value: ETOC
+        -
+           Key: usage-id
+           Value: BB00000008
+        -
+           Key: exp-date
+           Value: 99-00-9999
+        -
+           Key: env-type
+           Value: prd
+        -
+           Key: sd-period
+           Value: na
+        -
+           Key: category
+           Value: governance
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: MLEventBusPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: Stmt1458923121000
+                Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource:
+                  - !Sub 'arn:aws:events:${AWS::Region}:${EventBusAccountID}:event-bus/default'
+Outputs: {}
