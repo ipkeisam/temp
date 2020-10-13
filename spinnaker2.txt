@@ -1,0 +1,78 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  creationTimestamp: '2020-10-13T22:59:41Z'
+  generation: 1
+  name: open-enterprise-spinnaker
+  namespace: openshift-operators
+  resourceVersion: '145239299'
+  selfLink: >-
+    /apis/operators.coreos.com/v1alpha1/namespaces/openshift-operators/subscriptions/open-enterprise-spinnaker
+  uid: 58289d7b-bfdc-4898-8014-7e3b5549eaed
+spec:
+  channel: alpha
+  installPlanApproval: Automatic
+  name: open-enterprise-spinnaker
+  source: certified-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: open-enterprise-spinnaker.v1.20.5
+status:
+  catalogHealth:
+    - catalogSourceRef:
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        name: certified-operators
+        namespace: openshift-marketplace
+        resourceVersion: '145225448'
+        uid: 16ed4cb5-7901-11ea-adbd-06cbc54db063
+      healthy: true
+      lastUpdated: '2020-10-13T22:59:41Z'
+    - catalogSourceRef:
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        name: community-operators
+        namespace: openshift-marketplace
+        resourceVersion: '145225450'
+        uid: 15d110f0-7901-11ea-adbd-06cbc54db063
+      healthy: true
+      lastUpdated: '2020-10-13T22:59:41Z'
+    - catalogSourceRef:
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        name: redhat-marketplace
+        namespace: openshift-marketplace
+        resourceVersion: '145225453'
+        uid: e5bf6bd2-9fe1-475a-bc74-6b3dfb0bc5c9
+      healthy: true
+      lastUpdated: '2020-10-13T22:59:41Z'
+    - catalogSourceRef:
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        name: redhat-operators
+        namespace: openshift-marketplace
+        resourceVersion: '145225449'
+        uid: 1629a9ad-7901-11ea-adbd-06cbc54db063
+      healthy: true
+      lastUpdated: '2020-10-13T22:59:41Z'
+  conditions:
+    - lastTransitionTime: '2020-10-13T22:59:41Z'
+      message: all available catalogsources are healthy
+      reason: AllCatalogSourcesHealthy
+      status: 'False'
+      type: CatalogSourcesUnhealthy
+  currentCSV: open-enterprise-spinnaker.v1.20.5
+  installPlanGeneration: 7
+  installPlanRef:
+    apiVersion: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: install-m2c8f
+    namespace: openshift-operators
+    resourceVersion: '145238787'
+    uid: 8f4b7d07-5653-4adb-ad1e-a8e629c20e93
+  installplan:
+    apiVersion: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: install-m2c8f
+    uuid: 8f4b7d07-5653-4adb-ad1e-a8e629c20e93
+  lastUpdated: '2020-10-13T22:59:41Z'
+  state: UpgradePending
