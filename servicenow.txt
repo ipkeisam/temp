@@ -1,0 +1,15 @@
+curl -X POST \
+  https://capitalgroupdev.service-now.com/api/cgm/incident \
+  -H 'Accept: application/json' \
+  -H 'Accept-Encoding: gzip, deflate' \
+  -H 'Authorization: Basic Y29uaXdzOjIwMTFNYWNhdSE=,Basic cGRzLndlYnNlcnZpY2U6UERTU2VydmljZW5vdyMx' \
+  -H 'Cache-Control: no-cache' \
+  -H 'Connection: keep-alive' \
+  -H 'Content-Length: 306' \
+  -H 'Content-Type: application/json' \
+  -H 'Cookie: BIGipServerpool_capitalgroupdev=2475055370.45630.0000; glide_user_route=glide.3ab8711f1cd74d32cfed717f106c4341; JSESSIONID=D0A685B315D66E3C48B0A503E66E3A9F' \
+  -H 'Host: capitalgroupdev.service-now.com' \
+  -H 'Postman-Token: 135f5ae9-a865-4c1a-8ef4-6012992ddf5c,864fb09d-c64b-40a9-ae12-75ff6c7c71df' \
+  -H 'User-Agent: PostmanRuntime/7.15.2' \
+  -H 'cache-control: no-cache' \
+  -d '{"caller_id":"Niraj Patel","business_service":"ServiceNow","category":"Access","contact_type":"email","assignment_group":"A&S Testing","short_description":"TEST TEST BY BY Demo NNMP", "assigned_to":"Sushant Sharma","impact":"2","cmdb_ci":"ipa_nt_clean_up_perf","template":"IpControl New IP Range Template"}'
