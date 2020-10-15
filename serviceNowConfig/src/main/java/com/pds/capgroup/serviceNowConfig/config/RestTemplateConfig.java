@@ -1,4 +1,4 @@
-package com.pds.capgroup.serviceNowConfig.Config;
+package com.pds.capgroup.serviceNowConfig.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

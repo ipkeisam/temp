@@ -47,9 +47,6 @@ public class ServiceNowClient {
     @Value("${servicenow.template}")
     public String template;
 
-    @Value("${servicenow.encodedAuth}")
-    public String encodedAuth;
-
     @Autowired
     public RestTemplate restTemplate;
 
@@ -59,6 +56,7 @@ public class ServiceNowClient {
     {
         try
         {
+            String encodedAuth = System.getenv().getOrDefault("ENCODED_AUTH", "");
             HttpHeaders headers = new HttpHeaders();
             headers.add("Content-Type", "application/json");
             headers.add("Authorization", "Basic " + encodedAuth);
