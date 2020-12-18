@@ -1,0 +1,94 @@
+The following documentation is provided at https://confluence.capgroup.com/display/CNTEN/Moving+Application+from+SNX1+to+SNX2[Capital Group Confluence].
+
+Moving Application from SNX1 to SNX2
+This document is based on the following article.
+https://docs.openshift.com/dedicated/3/admin_guide/assembly_backing-up-restoring-project-application.html
+https://docs.portworx.com/portworx-install-with-kubernetes/disaster-recovery/async-dr/
+SNX1 and SNX2 cluster URL 
+https://ocp-console.prod-int-snx1.capgroup.com/
+https://ocp-console.prod-int-snx2.capgroup.com/
+Configure SNX2 cluster  
+1.	Log into SNX1 cluster to retrieve sync_whitelist.txt file. Copy this file over from SNX1 to SNX2 cluster 
+ls /root/ad-sync/sync_whitelist.txt
+2.	Run ocpGroupSync.sh from Openshift 3.11, SNX2 to pull in the required AD groups.
+/etc/cron.hourly/ocpGroupSync.sh
+3.	Add a label to the default project
+oc label namespace default name=default
+Backup application data in SNX1
+This section will be automated with Ansible Playbook. A cron job will be created to back up the SNX1 data once a day. 
+The playbook will run the steps as follows:
+
+1.	Get the application data mountPath from the deploymentconfig:
+2.	$ oc get dc/jenkins -o jsonpath='{ .spec.template.spec.containers[?(@.name=="jenkins")].volumeMounts[?(@.name=="jenkins-data")].mountPath }'
+/var/lib/jenkins
+3.	Get the name of the pod that is currently running:
+4.	$ oc get pod --selector=deploymentconfig=jenkins -o jsonpath='{ .metadata.name }'
+jenkins-1-37nux
+5.	Copy application data to backup directory:
+6.	$ oc rsync jenkins-1-37nux:/var/lib/jenkins /tmp/jenkins-backup
+7.	Copy the /tmp/backup application data from SNX1 to SNX2. SNX1 bastion has access to both SNX1 and SNX2 clusters.
+
+Backup Projects in SNX1
+1.	Log into the SNX1 bastion server.  Make sure the project backup directory is up to date.
+[ec2-user@ip-10-244-161-71 ~]$ ls -l ocp_project_backup/
+total 8268
+-rw-r--r--.  1 ec2-user ec2-user 1205331 Aug 19 20:29 int-dev-us-west-1.2019-08-19.tar.gz
+-rw-r--r--.  1 ec2-user ec2-user 1206371 Aug 20 20:28 int-dev-us-west-1.2019-08-20.tar.gz
+-rw-r--r--.  1 ec2-user ec2-user 1208084 Aug 21 20:29 int-dev-us-west-1.2019-08-21.tar.gz
+-rw-r--r--.  1 ec2-user ec2-user 1207556 Aug 22 20:29 int-dev-us-west-1.2019-08-22.tar.gz
+-rw-r--r--.  1 ec2-user ec2-user 1209426 Aug 23 20:30 int-dev-us-west-1.2019-08-23.tar.gz
+-rw-r--r--.  1 ec2-user ec2-user 1206655 Aug 24 20:29 int-dev-us-west-1.2019-08-24.tar.gz
+-rw-r--r--.  1 ec2-user ec2-user 1204886 Aug 25 20:29 int-dev-us-west-1.2019-08-25.tar.gz
+2.	If the project backup does not exists, or you want to get the latest project backup, run the playbook below.
+ansible-playbook playbooks/day2_ocp_project_backup.yml -e "master_hostname=ip-10-244-161-82.us-west-1.compute.internal env_var_file=int_dev_us_west_1.yml"
+ 
+https://bitbucket.capgroup.com/projects/PLAT/repos/cloud_automation/browse/AWS/compute/ansible/playbooks/day2_ocp_project_backup.yml
+
+3.	If you are running into issue using the playbook from the last step, you can run the oc commands to export the project objects as follows.
+
+$ oc get -o yaml --export all > project.yaml
+$ for object in rolebindings serviceaccounts secrets imagestreamtags cm egressnetworkpolicies rolebindingrestrictions limitranges resourcequotas pvc templates cronjobs statefulsets hpa deployments replicasets poddisruptionbudget endpoints
+do
+  oc get -o yaml --export $object > $object.yaml
+done
+$ oc api-resources --namespaced=true -o name
+Restore Projects to SNX2
+1.	Copy the latest backup tar file to the SNX2 bastion.
+$ tar -xzvf int-dev-us-west-1.2019-08-25.tar.gz
+ 
+ 
+$ ls | grep -ie projects
+projects
+2.	Creates a new directory and copy projects you want to re-import.
+$ mkdir /home/ec2-user/int-dev-west-projects
+  
+$ cp -rf /home/ec2-user/projects/aa00002822-horizon-dev-01 /home/ec2-user/int-dev-west-projects
+3.	
+1.	In the directory for each project which has a pipeline (ie, RabbitMQ doesn't have a pipeline), delete the folders for resources other than the namespace itself, role bindings, config maps, secrets, resourcequotas, networkpolicy,limitranges, serviceaccounts
+cd project1 && rm -rf buildconfigs cronjobs deploymentconfigs deployments egressnetworkpolicies endpoints hpas imagestreams imagestreamtags poddistributionbudget podpreset policies policybindings pvc pvcs replicasets rolebindingrestrictions roles routes services statefulsets templates
+2.	Do not do the above for projects which are not deployed with a pipeline. RabbitMQ, for example.
+4.	Run the following commands to import all objects over.
+$ oc new-project <projectname>
+$ for object in rolebindings serviceaccounts secrets imagestreamtags cm egressnetworkpolicies rolebindingrestrictions limitranges resourcequotas pvc templates cronjobs statefulsets hpa deployments replicasets poddisruptionbudget endpoints
+do
+  oc create-f $object.yaml
+done
+5.	
+6.	
+
+Restore Application Data in SNX2  
+This is a second playbook to restore application data to SNX2. A cron job will be created to sync the back up to the SNX2 on a nightly basis. 
+The detailed steps are listed below.
+1.	Verify that the backup was copied to SNX2
+2.	$ ls -la /tmp/jenkins-backup/
+3.	total 8
+4.	drwxrwxr-x.  3 user     user   20 Sep  6 11:14 .
+5.	drwxrwxrwt. 17 root     root 4096 Sep  6 11:16 ..
+drwxrwsrwx. 12 user     user 4096 Sep  6 11:14 jenkins
+6.	Use the oc rsync tool to copy the data into the running pod:
+$ oc rsync /tmp/jenkins-backup/jenkins jenkins-1-37nux:/var/lib
+7.	Restart the application with new data:
+$ oc delete pod jenkins-1-37nux
+8.	Scale down the deployment to 0, and then up again:
+9.	$ oc scale --replicas=0 dc/jenkins
+$ oc scale --replicas=1 dc/jenkins
