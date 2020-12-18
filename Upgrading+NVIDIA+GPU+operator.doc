@@ -1,0 +1,416 @@
+Date: Thu, 10 Dec 2020 10:07:32 -0800 (PST)
+Message-ID: <51360389.131858.1607623652591@x679636.cguser.capgroup.com>
+Subject: Exported From Confluence
+MIME-Version: 1.0
+Content-Type: multipart/related; 
+	boundary="----=_Part_131857_1883736690.1607623652591"
+
+------=_Part_131857_1883736690.1607623652591
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+Content-Location: file:///C:/exported.html
+
+<html xmlns:o=3D'urn:schemas-microsoft-com:office:office'
+      xmlns:w=3D'urn:schemas-microsoft-com:office:word'
+      xmlns:v=3D'urn:schemas-microsoft-com:vml'
+      xmlns=3D'urn:w3-org-ns:HTML'>
+<head>
+    <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dutf-8=
+">
+    <title>Upgrading NVIDIA GPU operator</title>
+    <!--[if gte mso 9]>
+    <xml>
+        <o:OfficeDocumentSettings>
+            <o:TargetScreenSize>1024x640</o:TargetScreenSize>
+            <o:PixelsPerInch>72</o:PixelsPerInch>
+            <o:AllowPNG/>
+        </o:OfficeDocumentSettings>
+        <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>90</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+    </xml>
+    <![endif]-->
+    <style>
+                <!--
+        @page Section1 {
+            size: 8.5in 11.0in;
+            margin: 1.0in;
+            mso-header-margin: .5in;
+            mso-footer-margin: .5in;
+            mso-paper-source: 0;
+        }
+
+        table {
+            border: solid 1px;
+            border-collapse: collapse;
+        }
+
+        table td, table th {
+            border: solid 1px;
+            padding: 5px;
+        }
+
+        td {
+            page-break-inside: avoid;
+        }
+
+        tr {
+            page-break-after: avoid;
+        }
+
+        div.Section1 {
+            page: Section1;
+        }
+
+        /* Confluence print stylesheet. Common to all themes for print medi=
+a */
+/* Full of !important until we improve batching for print CSS */
+
+@media print {
+    #main {
+        padding-bottom: 1em !important; /* The default padding of 6em is to=
+o much for printouts */
+    }
+
+    body {
+        font-family: Arial, Helvetica, FreeSans, sans-serif;
+        font-size: 10pt;
+        line-height: 1.2;
+    }
+
+    body, #full-height-container, #main, #page, #content, .has-personal-sid=
+ebar #content {
+        background: #fff !important;
+        color: #000 !important;
+        border: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+    }
+
+    a, a:link, a:visited, a:focus, a:hover, a:active {
+        color: #000;
+    }
+
+    #content h1,
+    #content h2,
+    #content h3,
+    #content h4,
+    #content h5,
+    #content h6 {
+        font-family: Arial, Helvetica, FreeSans, sans-serif;
+        page-break-after: avoid;
+    }
+
+    pre {
+        font-family: Monaco, "Courier New", monospace;
+    }
+
+    #header,
+    .aui-header-inner,
+    #navigation,
+    #sidebar,
+    .sidebar,
+    #personal-info-sidebar,
+    .ia-fixed-sidebar,
+    .page-actions,
+    .navmenu,
+    .ajs-menu-bar,
+    .noprint,
+    .inline-control-link,
+    .inline-control-link a,
+    a.show-labels-editor,
+    .global-comment-actions,
+    .comment-actions,
+    .quick-comment-container,
+    #addcomment {
+        display: none !important;
+    }
+
+    /* CONF-28544 cannot print multiple pages in IE */
+    #splitter-content {
+        position: relative !important;
+    }
+
+    .comment .date::before {
+        content: none !important; /* remove middot for print view */
+    }
+
+    h1.pagetitle img {
+        height: auto;
+        width: auto;
+    }
+
+    .print-only {
+        display: block;
+    }
+
+    #footer {
+        position: relative !important; /* CONF-17506 Place the footer at en=
+d of the content */
+        margin: 0;
+        padding: 0;
+        background: none;
+        clear: both;
+    }
+
+    #poweredby {
+        border-top: none;
+        background: none;
+    }
+
+    #poweredby li.print-only {
+        display: list-item;
+        font-style: italic;
+    }
+
+    #poweredby li.noprint {
+        display: none;
+    }
+
+    /* no width controls in print */
+    .wiki-content .table-wrap,
+    .wiki-content p,
+    .panel .codeContent,
+    .panel .codeContent pre,
+    .image-wrap {
+        overflow: visible !important;
+    }
+
+    /* TODO - should this work? */
+    #children-section,
+    #comments-section .comment,
+    #comments-section .comment .comment-body,
+    #comments-section .comment .comment-content,
+    #comments-section .comment p {
+        page-break-inside: avoid;
+    }
+
+    #page-children a {
+        text-decoration: none;
+    }
+
+    /**
+     hide twixies
+
+     the specificity here is a hack because print styles
+     are getting loaded before the base styles. */
+    #comments-section.pageSection .section-header,
+    #comments-section.pageSection .section-title,
+    #children-section.pageSection .section-header,
+    #children-section.pageSection .section-title,
+    .children-show-hide {
+        padding-left: 0;
+        margin-left: 0;
+    }
+
+    .children-show-hide.icon {
+        display: none;
+    }
+
+    /* personal sidebar */
+    .has-personal-sidebar #content {
+        margin-right: 0px;
+    }
+
+    .has-personal-sidebar #content .pageSection {
+        margin-right: 0px;
+    }
+
+    .no-print, .no-print * {
+        display: none !important;
+    }
+}
+-->
+    </style>
+</head>
+<body>
+    <h1>Upgrading NVIDIA GPU operator</h1>
+    <div class=3D"Section1">
+        <div class=3D"contentLayout2">=20
+<div class=3D"columnLayout single" data-layout=3D"single">=20
+<div class=3D"cell normal" data-type=3D"normal">=20
+<div class=3D"innerCell">=20
+<p>Before upgrading the NVIDIA GPU operator on CG OpenShift clusters, I rec=
+ommend to practice the installation of the NVIDIA GPU operator on a test cl=
+uster:</p>
+<ol>
+<li>Practice the installation of the GPU operator by following the NVIDIA d=
+ocumentation: <a href=3D"https://docs.nvidia.com/datacenter/kubernetes/open=
+shift-on-gpu-install-guide/#openshift-gpu-support-install-via-operatorhub" =
+class=3D"external-link" rel=3D"nofollow">https://docs.nvidia.com/datacenter=
+/kubernetes/openshift-on-gpu-install-guide/#openshift-gpu-support-install-v=
+ia-operatorhub</a></li>
+<li>Practice the installation using the Ansible automation: <a href=3D"http=
+s://bitbucket.capgroup.com/projects/PLAT/repos/openshift_nvidia_gpu/browse"=
+ class=3D"external-link" rel=3D"nofollow">https://bitbucket.capgroup.com/pr=
+ojects/PLAT/repos/openshift_nvidia_gpu/browse</a></li>
+</ol>
+<p>After you made yourself familiar with the NVIDIA GPU operator installati=
+on, proceed with the upgrade of the NVIDIA GPU operator on existing CG clus=
+ters by following the steps below:</p>
+<ol>
+<li>Check out the OCP cluster where the upgraded has already been completed=
+: <a href=3D"https://console-openshift-console.apps.ocp4-ideas-dev-west2.cs=
+p.capgroup.com" class=3D"external-link" rel=3D"nofollow">https://console-op=
+enshift-console.apps.ocp4-ideas-dev-west2.csp.capgroup.com</a> Use this clu=
+ster as an example of the target state where you want to get.</li>
+<li>Uninstall the existing NVIDIA GPU operator:
+<ol>
+<li><p>Delete the NVIDIA GPU operator subscription and delete the project:<=
+/p>
+<div class=3D"code panel pdl" style=3D"border-width: 1px;">
+<div class=3D"codeContent panelContent pdl">=20
+<pre class=3D"syntaxhighlighter-pre" data-syntaxhighlighter-params=3D"brush=
+: java; gutter: false; theme: Confluence" data-theme=3D"Confluence">$ oc de=
+lete subscription -n gpu-operator-resources gpu-operator
+$ oc delete project gpu-operator-resources
+$ oc delete clusterpolicy/nvidia-gpu </pre>=20
+</div>
+</div></li>
+<li><p>Ensure no NVIDIA CSVs are present, check using:</p>
+<div class=3D"code panel pdl" style=3D"border-width: 1px;">
+<div class=3D"codeContent panelContent pdl">=20
+<pre class=3D"syntaxhighlighter-pre" data-syntaxhighlighter-params=3D"brush=
+: java; gutter: false; theme: Confluence" data-theme=3D"Confluence">$ oc ge=
+t csv -A | grep gpu-operator</pre>=20
+</div>
+</div><p>If so, delete all the NVIDIA CSVs.</p></li>
+</ol></li>
+<li>Uninstall the existing NFD operator:
+<ol>
+<li><p>Delete the NFD operator subscription and delete the project:</p>
+<div class=3D"code panel pdl" style=3D"border-width: 1px;">
+<div class=3D"codeContent panelContent pdl">=20
+<pre class=3D"syntaxhighlighter-pre" data-syntaxhighlighter-params=3D"brush=
+: java; gutter: false; theme: Confluence" data-theme=3D"Confluence">$ oc de=
+lete subscription -n openshift-operators nfd
+$ oc delete project openshift-nfd</pre>=20
+</div>
+</div></li>
+<li><p>Ensure no NFD CSVs are present, check using:</p>
+<div class=3D"code panel pdl" style=3D"border-width: 1px;">
+<div class=3D"codeContent panelContent pdl">=20
+<pre class=3D"syntaxhighlighter-pre" data-syntaxhighlighter-params=3D"brush=
+: java; gutter: false; theme: Confluence" data-theme=3D"Confluence">$ oc ge=
+t csv -A | grep nfd</pre>=20
+</div>
+</div><p>Delete any remaining NFD CSVs.</p></li>
+</ol></li>
+<li>Modify GPU machinesets: remove gpu and app-gpu labels and add nvidia.co=
+m/gpu taints:
+<ol>
+<li>Remove the labels from the GPU machinesets. See the commit <a href=3D"h=
+ttps://bitbucket.capgroup.com/projects/PLAT/repos/openshift_nvidia_gpu/pull=
+-requests/8/commits/1a985d93fba679ab88a2da85d67fcb71dd051cf8#roles/openshif=
+t_gpu_nodes/templates/gpu-machineset.yml" class=3D"external-link" rel=3D"no=
+follow">https://bitbucket.capgroup.com/projects/PLAT/repos/openshift_nvidia=
+_gpu/pull-requests/8/commits/1a985d93fba679ab88a2da85d67fcb71dd051cf8#roles=
+/openshift_gpu_nodes/templates/gpu-machineset.yml</a> showing how to remove=
+ those labels.</li>
+<li>Add the<a href=3D"http://nvidia.com/gpu" class=3D"external-link" rel=3D=
+"nofollow"> nvidia.com/gpu</a> NoSchedule taint to GPU machinesets. See the=
+ commit <a href=3D"https://bitbucket.capgroup.com/projects/PLAT/repos/opens=
+hift_nvidia_gpu/pull-requests/9/commits/0c904edd530897b6a1e70f32152ea86a978=
+c673d#roles/openshift_gpu_nodes/templates/gpu-machineset.yml" class=3D"exte=
+rnal-link" rel=3D"nofollow">https://bitbucket.capgroup.com/projects/PLAT/re=
+pos/openshift_nvidia_gpu/pull-requests/9/commits/0c904edd530897b6a1e70f3215=
+2ea86a978c673d#roles/openshift_gpu_nodes/templates/gpu-machineset.yml</a> s=
+howing how to add the taints.</li>
+<li>If there are existing machines that has been created by the GPU machine=
+sets, scale the machinesets down to zero and back up to ensure that the GPU=
+ nodes are recycled and have the proper labels and taints.</li>
+<li>Note that you will need at least 1 GPU node in the cluster in order for=
+ the NVIDIA GPU operator installation to succeed.</li>
+</ol></li>
+<li>Install NFD operator
+<ol>
+<li><p>Use automation from the develop branch of <a href=3D"https://bitbuck=
+et.capgroup.com/projects/PLAT/repos/openshift_nvidia_gpu/browse" class=3D"e=
+xternal-link" rel=3D"nofollow">https://bitbucket.capgroup.com/projects/PLAT=
+/repos/openshift_nvidia_gpu/browse</a>. To intstall the NFD operator, run:<=
+/p>
+<div class=3D"code panel pdl" style=3D"border-width: 1px;">
+<div class=3D"codeContent panelContent pdl">=20
+<pre class=3D"syntaxhighlighter-pre" data-syntaxhighlighter-params=3D"brush=
+: java; gutter: false; theme: Confluence" data-theme=3D"Confluence">$ ansib=
+le-playbook -i inventory/localhost.ini openshift_nfd.yml</pre>=20
+</div>
+</div></li>
+</ol></li>
+<li>Install NVIDIA GPU operator. Make sure that you have at least one GPU e=
+nabled node in the cluster before running this step.
+<ol>
+<li><p>Use automation from the develop branch of <a href=3D"https://bitbuck=
+et.capgroup.com/projects/PLAT/repos/openshift_nvidia_gpu/browse" class=3D"e=
+xternal-link" rel=3D"nofollow">https://bitbucket.capgroup.com/projects/PLAT=
+/repos/openshift_nvidia_gpu/browse</a>. To intstall the GPU operator, run:<=
+/p>
+<div class=3D"code panel pdl" style=3D"border-width: 1px;">
+<div class=3D"codeContent panelContent pdl">=20
+<pre class=3D"syntaxhighlighter-pre" data-syntaxhighlighter-params=3D"brush=
+: java; gutter: false; theme: Confluence" data-theme=3D"Confluence">$ ansib=
+le-playbook -i inventory/localhost.ini openshift_nvidia_gpu.yml</pre>=20
+</div>
+</div></li>
+<li><p>Wait until all pods in the gpu-operator-resources namespaces are eit=
+her in the Running or Completed state. It should look something like this:<=
+/p>
+<div class=3D"code panel pdl" style=3D"border-width: 1px;">
+<div class=3D"codeContent panelContent pdl">=20
+<pre class=3D"syntaxhighlighter-pre" data-syntaxhighlighter-params=3D"brush=
+: java; gutter: false; theme: Confluence" data-theme=3D"Confluence">$ oc ge=
+t pod
+NAME                                       READY   STATUS      RESTARTS   A=
+GE
+gpu-watchdog-7f74cb5b8d-fzjmb              1/1     Running     0          1=
+8h
+nvidia-container-toolkit-daemonset-87g8d   1/1     Running     0          1=
+7h
+nvidia-container-toolkit-daemonset-8nwl6   1/1     Running     0          1=
+7h
+nvidia-device-plugin-daemonset-jdbh6       1/1     Running     0          1=
+7h
+nvidia-device-plugin-daemonset-wrk8w       1/1     Running     0          1=
+7h
+nvidia-device-plugin-validation            0/1     Completed   0          1=
+7h
+nvidia-driver-daemonset-j6z8r              1/1     Running     0          1=
+7h
+nvidia-driver-daemonset-pcdwp              1/1     Running     0          1=
+7h
+nvidia-driver-validation                   0/1     Completed   1          1=
+7h</pre>=20
+</div>
+</div><p>If you see the pods happy like in the above screenshot, the upgrad=
+e is complete.</p></li>
+</ol></li>
+</ol>
+<p><br></p>
+<p><br></p>
+</div>=20
+</div>=20
+</div>=20
+<div class=3D"columnLayout single" data-layout=3D"single">=20
+<div class=3D"cell normal" data-type=3D"normal">=20
+<div class=3D"innerCell">=20
+<p><u><strong>Troubleshooting</strong></u></p>
+<ol>
+<li>In ocp4-int-dev-east, step #5 of installing nfd operator failed because=
+ OpenDataHub Operator was causing conflicts.<br>Solution: Go to the Openshi=
+ft Console&nbsp;=E2=86=92 OperatorHub&nbsp;=E2=86=92 Uninstall OpenDatahub<=
+/li>
+</ol>
+</div>=20
+</div>=20
+</div>=20
+</div>
+    </div>
+</body>
+</html>
+------=_Part_131857_1883736690.1607623652591--
