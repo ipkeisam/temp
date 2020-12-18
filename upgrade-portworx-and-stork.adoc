@@ -1,0 +1,98 @@
+This documentation is provided at the https://confluence.capgroup.com/display/CNTEN/Upgrade+Portworx+and+Stork[Capital Group Confluence].
+
+Upgrade Portworx and Stork
+Portworx Images has been uploaded to cgprdregistry.capgroup.com
+cgprdregistry.capgroup.com/portworx/oci-monitor 2.6.0 564f36bb9fdc 19 hours ago 222 MB
+cgprdregistry.capgroup.com/openstorage/stork 2.4.5 ed43ce0084f3 36 hours ago 765 MB
+cgprdregistry.capgroup.com/portworx/px-node-wiper 2.5.0 3035a8e3ae81 11 days ago 2.59 GB
+cgprdregistry.capgroup.com/portworx/talisman 1.1.1 d9b3bcf7c80c 11 days ago 136 MB
+cgprdregistry.capgroup.com/portworx/px-enterprise 2.6.0 6fdf27d441ff 2 weeks ago 1.64 GB
+cgprdregistry.capgroup.com/portworx/px-operator 1.3.4 46fcf26d3899 3 weeks ago 123 MB
+cgprdregistry.capgroup.com/portworx/autopilot 1.2.1 86a08ad4395e 3 months ago 45.3 MB
+cgprdregistry.capgroup.com/portworx/px-lighthouse 2.0.7 3f76b65edb7f 5 months ago 632 MB
+cgprdregistry.capgroup.com/portworx/lh-stork-connector 2.0.7 a5b749b40756 5 months ago 246 MB
+cgprdregistry.capgroup.com/portworx/lh-config-sync 2.0.7 54e1b1fab3d0 6 months ago 234 MB
+cgprdregistry.capgroup.com/k8scsi/csi-provisioner v0.4.3 71b87572ce75 11 months ago 55.1 MB
+cgprdregistry.capgroup.com/k8scsi/csi-attacher v0.4.2 745afcfa40d7 21 months ago 49.4 MB
+cgprdregistry.capgroup.com/k8scsi/driver-registrar v0.4.2 3dea79996b3b 21 months ago 47.4 MB
+cgprdregistry.capgroup.com/google_containers/kube-controller-manager-amd64 v1.11.0 55b70b420785 2 years ago 155 MB
+cgprdregistry.capgroup.com/google_containers/kube-scheduler-amd64 v1.11.0 0e4a34a3b0e6 2 years ago 56.8 MB
+cgprdregistry.capgroup.com/k8s.gcr.io/pause 3.1 da86e6ba6ca1 2 years ago 742 kB
+The target Portworx version is 2.6 and Stork version is 2.4.5
+Playbook
+1. Clone the repository and get the latest code from the develop branch
+git clone https://bitbucket.capgroup.com/scm/plat/cloud_automation.git
+cd cloud_automation
+git checkout develop
+cd cloud_automation/AWS/compute/ansible/playbook
+2. If it hasn't been installed, install kubectl since this is required for the upgrade script
+wget https://storage.googleapis.com/kubernetes-release/release/v1.19.0/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+mv ./kubectl /usr/local/bin/kubectl
+3. Log into OCP cluster
+oc login https://ocp-console.dev-int-phx1.capgroup.com:443 --token=E5wMdeO8ouNmoyDhIXSySlVJFwHUmV0e1kxt51eqSqI
+4. Run the playbook from the jumpbox server of the cluster
+ansible-playbook -i /home/cpzinfbb00000085s002/ocp-provisioning/ocp-prod.cfg -e "portworx_version=2.6" -e "stork_version=2.4.5" day2_ocp_portworx_stork_upgrade.yml
+
+Manual Steps
+1. Download the Portworx upgrade script.
+wget --output-document=upgrade.sh https://install.portworx.com/2.6/upgrade 
+
+2. If it hasn't been installed, install kubectl since this is required for the upgrade script
+wget https://storage.googleapis.com/kubernetes-release/release/v1.19.0/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+mv ./kubectl /usr/local/bin/kubectl
+3. Log into the OCP cluster you are upgrading Portworx on
+oc login https://ocp-console.dev-int-phx1.capgroup.com:443 --token=E5wMdeO8ouNmoyDhIXSySlVJFwHUmV0e1kxt51eqSqI
+4. Check the available daemon sets
+$ oc get ds  -n kube-system
+NAME             DESIRED   CURRENT   READY     UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+portworx         4         4         4         4            4           <none>          1y
+portworx-api     4         4         4         4            4           <none>          1y
+portworx-infra   3         3         3         3            3           <none>          1y
+5. Update the daemonset for portworx. Remove the csibindmount definition.
+$ oc edit ds portworx -n kube-system
+$ oc edit ds portworx-infra -n kube-system
+$ oc edit ds portworx-api -n kube-system
+
+
+Remove the following lines
+
+        - mountPath: /var/lib/kubelet
+          name: csibindmountpath
+
+
+      - hostPath:
+          path: /var/lib/kubelet
+          type: ""
+        name: csibindmountpath
+6. Run the Portworx Upgrade
+bash upgrade.sh
+7. Get the Kube Version
+$ oc version
+oc v3.11.98
+kubernetes v1.11.0+d4cacc0
+features: Basic-Auth GSSAPI Kerberos SPNEGO
+
+Server https://ocp-console.dev-int-phx1.capgroup.com:443
+openshift v3.11.232
+kubernetes v1.11.0+d4cacc0
+
+8. Install StorkCtl Client
+STORK_POD=$(kubectl get pods -n kube-system -l name=stork -o jsonpath='{.items[0].metadata.name}') &&
+kubectl cp -n kube-system $STORK_POD:/storkctl/linux/storkctl ./storkctl
+sudo mv storkctl /usr/local/bin &&
+sudo chmod +x /usr/local/bin/storkctl
+9. Download Stork upgrade script. Replace the kube version (?kbver=KUBE_VERSION) from the output of the last step. 
+wget --output-document=stork.yaml  https://install.portworx.com/2.6?kbver=v1.11.0+d4cacc0&comp=stork
+10. Update the image registry for stork 
+oc edit deployment stork-scheduler
+# e.g. openstorage/stork:2.4.5 -> cgprdregistry.capgroup.com/google_containers/kube-scheduler-amd64 
+11. Apply the configuration
+oc delete -f stork.yaml
+oc apply -f stork.yaml
+12. Download Lighthouse upgrade script. 
+wget --output-document=lighthouse.yaml  https://install.portworx.com/2.6?comp=lighthouse
+13. Apply the configuration
+oc delete -f lighthouse.yaml
+oc apply -f lighthouse.yaml
